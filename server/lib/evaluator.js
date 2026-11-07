@@ -7,6 +7,7 @@ import { complete, pricing, providerInfo, LlmError } from './llm.js';
 import { normalizeAnswer, score, ScoringError } from '../../shared/scoring.js';
 import { scaleMax } from '../../shared/checklist.js';
 import { p, readJson, writeJson, listJson, safeId } from './store.js';
+import { computeReviewFlags } from './review.js';
 
 const MAX_REPAIRS = 2;
 
@@ -133,6 +134,7 @@ export async function evaluate({ group, conv, checklist, llm }) {
     appeals: [],
     final_score: result,
   };
+  record.review_flags = computeReviewFlags(record, conv, checklist);
   // Re-evaluation replaces the record; keep the previous one (with its appeals) in history.
   const prev = readJson(evalFile(group, conv.conversation_id, checklist.id));
   if (prev) writeJson(`${evalDir(group)}/history/${safeId(prev.conversation_id)}__${safeId(prev.checklist.id)}__${prev.id}.json`, prev);

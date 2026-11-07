@@ -145,7 +145,13 @@ class CardView {
         ks.map((k) => this.criterionResult(k, byId[k.id], scoreById[k.id])));
     });
     const orphan = checklist.criteria.filter((k) => checklist.sections?.length && !sections.some((s) => s.id === k.section));
-    mount(this.right, tools, summary, blocks,
+    const recFlags = (ev.review_flags || []).filter((f) => !f.criterion_id);
+    const nFlags = (ev.review_flags || []).length;
+    const flagBox = nFlags
+      ? h('div.alert.warn', h('b', `⚑ Требует проверки человеком: ${nFlags}`), recFlags.map((f) => h('div', f.message)),
+          nFlags > recFlags.length ? h('div', 'Отмечены критерии со значком ⚑ ниже.') : null)
+      : h('div.alert.info', '✓ Автоматические проверки пройдены: цитаты найдены в репликах, модель не сомневалась.');
+    mount(this.right, tools, summary, flagBox, blocks,
       orphan.length ? h('div', h('div.section-title', 'Без секции'), orphan.map((k) => this.criterionResult(k, byId[k.id], scoreById[k.id]))) : null);
   }
 
@@ -159,6 +165,7 @@ class CardView {
     return h('div.res', { id: `r-${k.id}` },
       h('div.res-head', h('span.t', `${k.id}. ${k.title}`), h(`span.ans.${cls}`, label), h('span.pts', pts)),
       stepLabel && h('div.muted', stepLabel),
+      (this.evaluation.review_flags || []).filter((f) => f.criterion_id === k.id).map((f) => h('div.flag-review', '⚑ ', f.message)),
       h('p', r.explanation),
       r.quote && h('p.muted', '«', r.quote, '»'),
       a === 'na' && r.na_reason && h('p', h('b', 'Причина N/A: '), r.na_reason),

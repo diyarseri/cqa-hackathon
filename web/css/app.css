@@ -154,3 +154,9 @@ body { margin: 0; background: #f5f7f6; }
 .seg button.on { background: var(--accent); color: #fff; }
 .agree-hi { color: var(--ok); font-weight: 700; }
 .agree-lo { color: var(--err); font-weight: 700; }
+.flag-review { font-size: .85rem; color: var(--warn); background: var(--warn-soft); border-radius: 6px; padding: .2rem .5rem; margin: .3rem 0; }
+/* insights bars: single series, one hue, value label in text ink */
+.bar { display: flex; align-items: center; gap: .5rem; min-width: 180px; }
+.bar > div { height: 12px; background: var(--accent); border-radius: 0 4px 4px 0; }
+.bar > span { font-variant-numeric: tabular-nums; color: var(--ink); font-size: .85rem; }
+.tbl.bars td:nth-child(2) { width: 45%; }

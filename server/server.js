@@ -8,9 +8,11 @@ import * as ev from './lib/evaluator.js';
 import * as ap from './lib/appeals.js';
 import * as batch from './lib/batch.js';
 import * as val from './lib/validation.js';
+import * as ins from './lib/insights.js';
 import { computeFacts } from './lib/facts.js';
 import { buildSystemPrompt, buildUserPrompt } from './lib/prompt.js';
 import { providerInfo, pricing } from './lib/llm.js';
+import { computeReviewFlags } from './lib/review.js';
 
 loadDotEnv();
 const app = new Router();
@@ -74,14 +76,20 @@ app.post('/api/groups/:group/conversations/:id/evaluate', async ({ params, body 
   return ev.evaluate({ group: params.group, conv, checklist });
 });
 
-app.get('/api/groups/:group/conversations/:id/evaluation', ({ params, query }) => {
+app.get('/api/groups/:group/conversations/:id/evaluation', async ({ params, query }) => {
   const e = ev.getEvaluation(params.group, params.id, query.get('checklist') || 'chat-quality');
   if (!e) throw httpError(404, 'not evaluated yet');
+  if (!e.review_flags) e.review_flags = computeReviewFlags(e, await ds.getConversation(params.group, params.id), cl.get(e.checklist.id, e.checklist.version));
   return e;
 });
 
-app.get('/api/groups/:group/evaluations', ({ params, query }) =>
-  ev.listEvaluations(params.group, query.get('checklist')).map((e) => ({
+app.get('/api/groups/:group/evaluations', async ({ params, query }) => {
+  const evals = ev.listEvaluations(params.group, query.get('checklist'));
+  if (evals.some((e) => !e.review_flags)) {
+    const convs = Object.fromEntries((await ds.getConversations(params.group)).map((c) => [c.conversation_id, c]));
+    for (const e of evals) if (!e.review_flags) e.review_flags = computeReviewFlags(e, convs[e.conversation_id], cl.get(e.checklist.id, e.checklist.version));
+  }
+  return evals.map((e) => ({
     conversation_id: e.conversation_id,
     checklist: e.checklist,
     created_at: e.created_at,
@@ -90,9 +98,10 @@ app.get('/api/groups/:group/evaluations', ({ params, query }) =>
     final_total: e.final_score.total,
     gross_error: e.final_score.gross_error,
     open_appeals: e.appeals.filter((a) => a.status === 'open').length,
+    review_flags: (e.review_flags || []).length,
     cost_usd_estimate: e.cost_usd_estimate,
-  })),
-);
+  }));
+});
 
 // ---- Step 6: appeals ----------------------------------------------------------
 app.get('/api/groups/:group/appeals', ({ params, query }) =>
@@ -162,6 +171,9 @@ app.get('/api/groups/:group/conversations/:id/label', ({ params, query }) =>
   val.getLabel(params.group, params.id, query.get('checklist') || 'chat-quality') || {},
 );
 app.put('/api/groups/:group/conversations/:id/label', ({ params, body }) => val.saveLabel(params.group, params.id, body));
+
+// ---- Insights ---------------------------------------------------------------------
+app.get('/api/groups/:group/insights', ({ params, query }) => ins.insights(params.group, query.get('checklist') || 'chat-quality'));
 
 // ---- static UI ----------------------------------------------------------------
 app.static('/shared/', path.join(PROJECT_ROOT, 'shared')); // pure modules shared with the browser

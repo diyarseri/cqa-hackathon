@@ -5,6 +5,7 @@ import { h, mount, errorBox } from './ui.js';
 const routes = [
   [/^#?\/?$/, () => import('./views/dialogs.js'), 'dialogs'],
   [/^#\/c\/([^/]+)(?:\/(\d+))?$/, () => import('./views/card.js'), 'dialogs'],
+  [/^#\/insights$/, () => import('./views/insights.js'), 'insights'],
   [/^#\/batch$/, () => import('./views/batch.js'), 'batch'],
   [/^#\/checklists(?:\/([^/]+))?$/, () => import('./views/checklists.js'), 'checklists'],
   [/^#\/appeals(?:\/([^/]+))?$/, () => import('./views/appeals.js'), 'appeals'],

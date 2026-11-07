@@ -29,6 +29,7 @@ export async function render(root, ctx) {
       if (state.status === 'done' && !e) return false;
       if (state.status === 'gross' && !e?.gross_error) return false;
       if (state.status === 'appeal' && !e?.open_appeals) return false;
+      if (state.status === 'review' && !e?.review_flags) return false;
       return true;
     });
     mount(tbody, rows.map((c) => {
@@ -41,7 +42,7 @@ export async function render(root, ctx) {
         h('td.num', c.messages),
         h('td.num', e ? h('span.score', fmtScore(e.final_total)) : h('span.muted', 'не оценён')),
         h('td', changed ? h('span.muted', `было ${fmtScore(e.original_total)}`) : ''),
-        h('td', e?.gross_error ? h('span.flag-gross', '⚠ грубая ошибка') : ''),
+        h('td', e?.gross_error ? h('span.flag-gross', '⚠ грубая ошибка') : '', e?.review_flags ? h('span.pill.warn', { title: 'Требует проверки человеком' }, `⚑ ${e.review_flags}`) : ''),
         h('td', e?.open_appeals ? h('span.pill.warn', `апелляций: ${e.open_appeals}`) : ''),
       );
     }));
@@ -66,7 +67,7 @@ export async function render(root, ctx) {
       h('input', { type: 'search', placeholder: 'Поиск по ID…', oninput: (ev) => { state.q = ev.target.value; draw(); } }),
       sel('lang', [['', 'Все языки'], ...langs.map((l) => [l, l])]),
       sel('channel', [['', 'Все каналы'], ['agent chat', 'Чаты'], ['voice call', 'Звонки']]),
-      sel('status', [['', 'Все'], ['todo', 'Не оценённые'], ['done', 'Оценённые'], ['gross', 'Грубые ошибки'], ['appeal', 'Открытые апелляции']]),
+      sel('status', [['', 'Все'], ['todo', 'Не оценённые'], ['done', 'Оценённые'], ['gross', 'Грубые ошибки'], ['review', '⚑ Требуют проверки'], ['appeal', 'Открытые апелляции']]),
       await checklistPicker(() => render(root, ctx)),
       h('button.btn', {
         onclick: async () => {
