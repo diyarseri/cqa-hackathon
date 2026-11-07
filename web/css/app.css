@@ -958,7 +958,7 @@ html[data-theme="dark"] .cqa .more-menu-card a.on { color: #8eec8c !important; }
 }
 .cqa .header-primary { border-color: var(--accent); background: var(--accent); color: #063c22 !important; }
 
-.cqa .cqa-view { width: min(100%, 1240px); padding: 2.25rem 1.5rem 4rem; }
+.cqa .cqa-view { width: min(100%, 1240px); padding: 2.25rem 1.5rem 7rem; }
 .cqa .route-stage.route-ready { animation-duration: .18s; }
 .cqa h1 { font-size: clamp(2rem, 3.3vw, 2.55rem); font-weight: 740; }
 .cqa h2 { margin: 2rem 0 .8rem; font-size: clamp(1.4rem, 2vw, 1.7rem); }
@@ -1043,11 +1043,15 @@ html[data-theme="dark"] .cqa .attention-banner { border-color: #745d32; backgrou
 .cqa .home-benefit-icon { display: grid; width: 42px; height: 42px; place-items: center; border-radius: 12px; background: #dbfad4; color: #157335; font-size: 1.25rem; font-weight: 800; }
 .cqa .home-benefit h3 { margin: 1rem 0 .35rem; }
 .cqa .home-benefit p { color: var(--muted); }
-.cqa .setup-card { padding: 2rem; border: 1px solid #f1c3bd; border-radius: 22px; background: #fff; }
+.cqa .setup-card { display: grid; grid-template-columns: minmax(0, 1fr) 230px; align-items: center; gap: 2rem; padding: 2rem; border: 1px solid #f1c3bd; border-radius: 22px; background: #fff; }
 html[data-theme="dark"] .cqa .setup-card { border-color: #69433e; background: var(--surface); }
 .cqa .setup-badge { display: inline-flex; padding: .3rem .55rem; border-radius: 7px; background: var(--err-soft); color: var(--err); font-size: .72rem; font-weight: 750; letter-spacing: .06em; }
 .cqa .setup-card h2 { margin-top: .8rem; }
 .cqa .setup-card code { display: block; max-width: 620px; margin: 1rem 0; padding: .8rem; border-radius: 10px; background: var(--surface-soft); }
+.cqa .setup-guide { align-self: end; text-align: center; }
+.cqa .setup-guide img { display: block; width: min(100%, 210px); height: auto; margin: 0 auto -.25rem; }
+.cqa .setup-guide p { margin: 0; padding: .65rem .75rem; border-radius: 12px; background: var(--accent-soft); color: var(--brand-raised); font-size: .84rem; font-weight: 650; }
+html[data-theme="dark"] .cqa .setup-guide p { color: var(--ink); }
 
 /* Simple list and batch screens */
 .cqa .dialog-search { display: flex; align-items: end; gap: 1rem; padding: 1.2rem; border: 1px solid var(--line); border-radius: 17px; background: var(--surface); }
@@ -1069,14 +1073,16 @@ html[data-theme="dark"] .cqa .batch-start { background: linear-gradient(110deg, 
 .cqa .progress > div::after { display: none; }
 
 /* Help */
-.cqa .help-dialog { width: min(680px, calc(100vw - 2rem)); padding: 0; border: 0; border-radius: 22px; background: var(--surface); box-shadow: var(--shadow-md); color: var(--ink); }
+.cqa .help-dialog { width: min(680px, calc(100vw - 2rem)); max-height: calc(100dvh - 2rem); padding: 0; overflow-y: auto; border: 0; border-radius: 22px; background: var(--surface); box-shadow: var(--shadow-md); color: var(--ink); }
 .cqa .help-dialog::backdrop { background: rgba(3, 30, 24, .62); backdrop-filter: blur(3px); }
 .cqa .help-shell { padding: 1.6rem; }
-.cqa .help-heading { display: flex; align-items: flex-start; justify-content: space-between; gap: 1rem; }
+.cqa .help-heading { display: grid; grid-template-columns: minmax(0, 1fr) 145px auto; align-items: start; gap: 1rem; }
 .cqa .help-heading .eyebrow { border-color: var(--line); color: #147239; }
 html[data-theme="dark"] .cqa .help-heading .eyebrow,
 html[data-theme="dark"] .cqa .help-steps > div > span { color: #8eec8c; }
 .cqa .help-heading h2 { margin: .55rem 0 0; }
+.cqa .help-heading p { max-width: 330px; margin: .35rem 0 0; color: var(--muted); font-size: .9rem; }
+.cqa .help-mascot { display: block; width: 145px; height: auto; margin: -.85rem 0 -1.25rem; }
 .cqa .help-close { min-width: 42px; min-height: 42px; border: 0; border-radius: 10px; background: var(--surface-soft); color: var(--ink); cursor: pointer; font: inherit; }
 .cqa .help-heading > .help-close { font-size: 1.4rem; }
 .cqa .help-steps { display: grid; gap: .75rem; margin: 1.4rem 0; }
@@ -1085,6 +1091,38 @@ html[data-theme="dark"] .cqa .help-steps > div > span { color: #8eec8c; }
 .cqa .help-steps section strong { color: var(--ink-strong); }
 .cqa .help-steps p { margin: .15rem 0 0; color: var(--muted); font-size: .88rem; }
 .cqa .help-footer { display: flex; justify-content: flex-end; gap: .65rem; }
+
+/* Friendly guide: one consistent entrance to Help across every page. */
+.cqa .assistant-launcher {
+  position: fixed;
+  z-index: 55;
+  right: max(1rem, calc((100vw - 1540px) / 2 + 1rem));
+  bottom: 1.15rem;
+  display: flex;
+  min-width: 205px;
+  min-height: 66px;
+  align-items: center;
+  gap: .65rem;
+  padding: .35rem .85rem .35rem .35rem;
+  border: 1px solid var(--line-strong);
+  border-radius: 18px;
+  background: color-mix(in srgb, var(--surface) 94%, transparent);
+  box-shadow: 0 14px 38px rgba(5, 58, 47, .18);
+  color: var(--ink);
+  cursor: pointer;
+  font: inherit;
+  text-align: left;
+  backdrop-filter: blur(12px);
+  animation: assistant-in .3s ease;
+}
+.cqa .assistant-launcher:hover { border-color: #76bd81; transform: translateY(-2px); }
+.cqa .assistant-launcher:focus-visible { outline: 3px solid var(--accent-ring); outline-offset: 3px; }
+.cqa .assistant-launcher img { width: 58px; height: 54px; object-fit: contain; transition: transform .18s ease; }
+.cqa .assistant-launcher:hover img { transform: rotate(-2deg) scale(1.04); }
+.cqa .assistant-launcher span { display: flex; flex-direction: column; }
+.cqa .assistant-launcher strong { color: var(--ink-strong); font-size: .9rem; }
+.cqa .assistant-launcher small { margin-top: .08rem; color: var(--muted); font-size: .75rem; }
+@keyframes assistant-in { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
 
 /* Tables are readable text first, not dense spreadsheets. */
 .cqa .table-scroll { border-radius: 17px; box-shadow: none; }
@@ -1123,7 +1161,7 @@ html[data-theme="dark"] .cqa .help-steps > div > span { color: #8eec8c; }
   .cqa .tabs.open { display: flex; }
   .cqa .tabs > a, .cqa .more-menu > summary { width: 100%; min-height: 50px; padding: .65rem .75rem; }
   .cqa .more-menu-card { position: static; width: 100%; margin-top: .25rem; border: 0; box-shadow: none; background: var(--surface-soft); }
-  .cqa .cqa-view { padding: 1rem .8rem 2.5rem; }
+  .cqa .cqa-view { padding: 1rem .8rem 5.5rem; }
   .cqa .home-page { gap: 1.5rem; }
   .cqa .home-hero { min-height: 540px; padding: 1.65rem; border-radius: 21px; }
   .cqa .home-hero h1 { font-size: 2.35rem; }
@@ -1148,9 +1186,18 @@ html[data-theme="dark"] .cqa .help-steps > div > span { color: #8eec8c; }
   .cqa[data-route="dialogs"] .tbl td:nth-child(3)::before,
   .cqa[data-route="dialogs"] .tbl td:nth-child(4)::before { content: attr(data-label); color: var(--muted); }
   .cqa[data-route="dialogs"] .tbl td:last-child .btn { width: 100%; margin-top: .35rem; }
+  .cqa .setup-card { grid-template-columns: 1fr; gap: .75rem; padding: 1.35rem; }
+  .cqa .setup-guide { display: grid; grid-template-columns: 105px minmax(0, 1fr); align-items: center; text-align: left; }
+  .cqa .setup-guide img { width: 105px; margin: 0; }
+  .cqa .setup-guide p { margin-left: -.25rem; }
   .cqa .help-shell { padding: 1.1rem; }
+  .cqa .help-heading { grid-template-columns: minmax(0, 1fr) 96px auto; gap: .55rem; }
+  .cqa .help-mascot { width: 96px; margin: -.35rem 0 -.85rem; }
   .cqa .help-footer { flex-direction: column; }
   .cqa .help-footer .btn { width: 100%; }
+  .cqa .assistant-launcher { right: .8rem; bottom: .8rem; min-width: 60px; min-height: 60px; width: 60px; height: 60px; padding: .2rem; border-radius: 50%; }
+  .cqa .assistant-launcher img { width: 56px; height: 54px; }
+  .cqa .assistant-launcher span { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); clip-path: inset(50%); white-space: nowrap; }
 }
 
 @media (max-width: 430px) {
@@ -1160,4 +1207,6 @@ html[data-theme="dark"] .cqa .help-steps > div > span { color: #8eec8c; }
   .cqa .menu-toggle span:last-child { display: none; }
   .cqa .home-hero h1 { font-size: 2.05rem; }
   .cqa .home-hero-art { width: 110%; }
+  .cqa .help-heading { grid-template-columns: minmax(0, 1fr) auto; }
+  .cqa .help-mascot { grid-column: 1 / -1; grid-row: 2; width: 92px; margin: -.35rem auto -1rem; }
 }

@@ -69,6 +69,12 @@
     <main id="cqa-view" class="cqa-view" tabindex="-1"></main>
     <div id="cqa-toast" class="toast" role="status" aria-live="polite" hidden></div>
 
+    <button id="cqa-assistant" class="assistant-launcher" type="button"
+            aria-label="Открыть помощь" aria-haspopup="dialog" aria-controls="cqa-help">
+      <img src="assets/cqa-guide-robot.webp" alt="" width="760" height="682" aria-hidden="true">
+      <span><strong>Нужна помощь?</strong><small>Покажу, что делать</small></span>
+    </button>
+
     <dialog id="cqa-command" class="command-dialog" aria-labelledby="cqa-command-title">
       <div class="command-shell">
         <div class="command-heading">
@@ -96,7 +102,9 @@
           <div>
             <span class="eyebrow">БЫСТРЫЙ СТАРТ</span>
             <h2 id="cqa-help-title">Как пользоваться системой</h2>
+            <p>Я помогу начать — всего четыре простых шага.</p>
           </div>
+          <img class="help-mascot" src="assets/cqa-guide-robot.webp" alt="" width="760" height="682" aria-hidden="true">
           <button class="help-close" type="button" aria-label="Закрыть">×</button>
         </div>
         <div class="help-steps">

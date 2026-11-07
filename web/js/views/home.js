@@ -92,7 +92,7 @@ function dashboard(ctx, checklistId, conversations, evaluations) {
           h('a.simple-link', { href: csv }, 'Скачать →')),
         h('article.quick-action',
           h('div', h('h3', 'Как пользоваться'), h('p', 'Короткая инструкция из четырёх шагов.')),
-          h('button.simple-link', { type: 'button', onclick: () => document.getElementById('cqa-help')?.showModal() }, 'Показать →')),
+          h('button.simple-link', { type: 'button', onclick: () => document.getElementById('cqa-assistant')?.click() }, 'Показать →')),
       )),
   ];
 }
@@ -143,14 +143,18 @@ function benefit(symbol, title, text) {
 
 function setupState(error) {
   return h('section.setup-card', { role: 'alert' },
-    h('span.setup-badge', 'НУЖНА НАСТРОЙКА'),
-    h('h2', 'Подключите набор данных'),
-    h('p', 'Сайт уже работает. Чтобы увидеть диалоги, один раз добавьте ссылку организаторов в файл .env.'),
-    h('ol',
-      h('li', 'Откройте страницу 3 в Student Guide.'),
-      h('li', 'Скопируйте адрес кнопки «Открыть GET для DEV».'),
-      h('li', 'Вставьте адрес после CQA_API_URL= и перезапустите сайт.')),
-    h('code', 'CQA_API_URL=https://…'),
-    h('details', h('summary', 'Показать техническую причину'), h('p', error?.message || String(error))),
+    h('div.setup-copy',
+      h('span.setup-badge', 'НУЖНА НАСТРОЙКА'),
+      h('h2', 'Подключите набор данных'),
+      h('p', 'Сайт уже работает. Чтобы увидеть диалоги, один раз добавьте ссылку организаторов в файл .env.'),
+      h('ol',
+        h('li', 'Откройте страницу 3 в Student Guide.'),
+        h('li', 'Скопируйте адрес кнопки «Открыть GET для DEV».'),
+        h('li', 'Вставьте адрес после CQA_API_URL= и перезапустите сайт.')),
+      h('code', 'CQA_API_URL=https://…'),
+      h('details', h('summary', 'Показать техническую причину'), h('p', error?.message || String(error)))),
+    h('div.setup-guide',
+      h('img', { src: 'assets/cqa-guide-robot.webp', alt: '', width: 760, height: 682, 'aria-hidden': true }),
+      h('p', 'Ссылку нужно добавить только один раз. Потом я покажу все диалоги.')),
   );
 }
