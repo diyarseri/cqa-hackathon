@@ -4,10 +4,13 @@ import { listEvaluations } from './evaluator.js';
 import * as cl from './checklists.js';
 import { normalizeAnswer, score } from '../../shared/scoring.js';
 
-// Default validation sample: mixed languages, channels, good and bad dialogues.
+// Validation sample chosen to calibrate the uncertain interpretations:
+// closings (full summary / plain goodbye / "Bye." / none), incomplete answers,
+// informal greeting, long KZ and EN chats, and two calls (hold, IVR).
+// Gross-error dialogues are left out: all 8 are already detected.
 export const SUGGESTED_DEV = [
-  'p1-ru-001', 'p1-ru-009', 'p1-ru-018', 'p1-ru-029', 'p1-kz-005',
-  'p1-kz-013', 'p1-en-007', 'p1-en-015', 'p4-ru-002', 'p4-ru-004',
+  'p1-ru-001', 'p1-ru-002', 'p1-ru-003', 'p1-ru-014', 'p1-kz-003',
+  'p1-kz-005', 'p1-en-006', 'p1-en-015', 'p4-ru-002', 'p4-ru-005',
 ];
 
 const file = (g, conv, cid) => p('labels', safeId(g), `${safeId(conv)}__${safeId(cid)}.json`);
