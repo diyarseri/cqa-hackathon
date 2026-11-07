@@ -41,6 +41,11 @@ export async function render(root, ctx, jobId) {
         h('label.check', 'Параллельно: ', conc),
         h('button.btn.primary', { onclick: start }, `▶ Оценить весь набор ${ctx.group}`),
         h('a.btn.ghost', { href: `/api/groups/${enc(ctx.group)}/results.csv?checklist=${enc(await currentChecklist())}` }, '⬇ CSV результатов')),
+      h('div.toolbar',
+        h('b', 'Обмен с напарником / резервная копия:'),
+        h('a.btn', { href: `/api/groups/${enc(ctx.group)}/export` }, `⬇ Экспорт набора ${ctx.group} (оценки, апелляции, разметка, чек-листы)`),
+        h('label.btn', { style: { flexDirection: 'row', margin: 0, color: 'var(--ink)', cursor: 'pointer' } }, '⬆ Импорт файла',
+          h('input', { type: 'file', accept: '.json,application/json', hidden: true, onchange: (e) => importFile(e.target, root, ctx) }))),
       h('p.muted', 'Контрольный набор: выберите «+ другой group_id…» в правом верхнем углу, затем запустите здесь. Ошибки модели повторяются автоматически (до 4 попыток с паузой 2→4→8 с).')),
     jobBox,
     jobs.length ? h('details.box', h('summary', `Предыдущие запуски (${jobs.length})`),
@@ -49,6 +54,18 @@ export async function render(root, ctx, jobId) {
         h('td', `${j.counts.done} ✓ · ${j.counts.skipped} пропущено · ${j.counts.error} ошибок`), h('td', fmtDate(j.started_at)))))) : null,
   );
   if (active) watch(jobBox, ctx, active);
+}
+
+async function importFile(input, root, ctx) {
+  const file = input.files?.[0];
+  if (!file) return;
+  try {
+    const r = await api.post('/api/import', JSON.parse(await file.text()));
+    toast(`Импорт ${r.group_id}: оценок ${r.evaluations} (оставлено своих ${r.evaluations_kept_local}), разметок ${r.labels}, версий чек-листов ${r.checklist_versions}${r.checklist_conflicts.length ? `, конфликтов ${r.checklist_conflicts.length}` : ''}`);
+    render(root, ctx);
+  } catch (e) {
+    toast(`Импорт не удался: ${e.message}`, 'err');
+  }
 }
 
 function watch(box, ctx, id) {

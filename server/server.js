@@ -9,6 +9,7 @@ import * as ap from './lib/appeals.js';
 import * as batch from './lib/batch.js';
 import * as val from './lib/validation.js';
 import * as ins from './lib/insights.js';
+import * as bundle from './lib/bundle.js';
 import { computeFacts } from './lib/facts.js';
 import { buildSystemPrompt, buildUserPrompt } from './lib/prompt.js';
 import { providerInfo, pricing } from './lib/llm.js';
@@ -174,6 +175,18 @@ app.put('/api/groups/:group/conversations/:id/label', ({ params, body }) => val.
 
 // ---- Insights ---------------------------------------------------------------------
 app.get('/api/groups/:group/insights', ({ params, query }) => ins.insights(params.group, query.get('checklist') || 'chat-quality'));
+
+// ---- Export / import (share results between laptops, offline demo) -------------
+app.get('/api/groups/:group/export', ({ params, res }) => {
+  const body = JSON.stringify(bundle.exportBundle(params.group));
+  const stamp = new Date().toISOString().slice(0, 16).replace(/[:T]/g, '-');
+  res.writeHead(200, {
+    'content-type': 'application/json; charset=utf-8',
+    'content-disposition': `attachment; filename="cqa-${params.group}-${stamp}.json"`,
+  });
+  res.end(body);
+});
+app.post('/api/import', ({ body }) => bundle.importBundle(body));
 
 // ---- static UI ----------------------------------------------------------------
 app.static('/shared/', path.join(PROJECT_ROOT, 'shared')); // pure modules shared with the browser
