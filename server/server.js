@@ -74,7 +74,7 @@ app.get('/api/groups/:group/conversations/:id/prompt', async ({ params, query })
 app.post('/api/groups/:group/conversations/:id/evaluate', async ({ params, body }) => {
   const conv = await ds.getConversation(params.group, params.id);
   const checklist = cl.get(body.checklist_id || 'chat-quality', body.checklist_version);
-  return ev.evaluate({ group: params.group, conv, checklist });
+  return ev.evaluate({ group: params.group, conv, checklist, runs: body.runs });
 });
 
 app.get('/api/groups/:group/conversations/:id/evaluation', async ({ params, query }) => {
@@ -141,6 +141,7 @@ app.post('/api/batch', ({ body }) =>
     onlyMissing: body.only_missing !== false,
     refresh: !!body.refresh,
     concurrency: body.concurrency,
+    runs: body.runs,
   }),
 );
 app.get('/api/batch', () => batch.listJobs());

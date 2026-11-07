@@ -13,7 +13,8 @@ export async function render(root, ctx, jobId) {
 
   const onlyMissing = h('input', { type: 'checkbox', checked: true });
   const refresh = h('input', { type: 'checkbox' });
-  const conc = h('input', { type: 'number', min: 1, max: 8, value: 2, style: { width: '4.5rem' } });
+  const conc = h('input', { type: 'number', min: 1, max: 8, value: 4, style: { width: '4.5rem' } });
+  const runs = h('select', { style: { width: 'auto' } }, [1, 3, 5].map((n) => h('option', { value: n, selected: n === 3 }, n === 1 ? '1 (быстро)' : `${n} (голосование)`)));
   const jobBox = h('div');
 
   const start = async (e) => {
@@ -21,7 +22,7 @@ export async function render(root, ctx, jobId) {
     try {
       const job = await api.post('/api/batch', {
         group_id: ctx.group, checklist_id: await currentChecklist(),
-        only_missing: onlyMissing.checked, refresh: refresh.checked, concurrency: Number(conc.value),
+        only_missing: onlyMissing.checked, refresh: refresh.checked, concurrency: Number(conc.value), runs: Number(runs.value),
       });
       toast(`Запущено: ${job.items.length} диалогов`);
       watch(jobBox, ctx, job.id);
@@ -39,6 +40,7 @@ export async function render(root, ctx, jobId) {
         h('label.check', onlyMissing, ' только неоценённые / оценённые старой версией чек-листа'),
         h('label.check', refresh, ' заново загрузить набор из API'),
         h('label.check', 'Параллельно: ', conc),
+        h('label.check', 'Прогонов на диалог: ', runs),
         h('button.btn.primary', { onclick: start }, `▶ Оценить весь набор ${ctx.group}`),
         h('a.btn.ghost', { href: `/api/groups/${enc(ctx.group)}/results.csv?checklist=${enc(await currentChecklist())}` }, '⬇ CSV результатов')),
       h('div.toolbar',

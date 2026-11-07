@@ -23,7 +23,7 @@ function summarize(job) {
   return job;
 }
 
-export async function startBatch({ group, checklistId = 'chat-quality', onlyMissing = true, refresh = false, concurrency = 2, ids, llm } = {}) {
+export async function startBatch({ group, checklistId = 'chat-quality', onlyMissing = true, refresh = false, concurrency = 2, ids, llm, runs } = {}) {
   if (!group) throw httpError(400, 'group is required');
   const checklist = cl.get(checklistId); // current version at start; pinned for the whole job
   const convs = await ds.getConversations(group, { refresh });
@@ -34,6 +34,7 @@ export async function startBatch({ group, checklistId = 'chat-quality', onlyMiss
     checklist: { id: checklist.id, version: checklist.version, name: checklist.name },
     only_missing: onlyMissing,
     concurrency: Math.max(1, Math.min(8, Number(concurrency) || 2)),
+    runs: Math.max(1, Math.min(7, Number(runs ?? process.env.EVAL_RUNS ?? 1) || 1)),
     status: 'running',
     started_at: new Date().toISOString(),
     finished_at: null,
@@ -105,7 +106,7 @@ async function evalWithRetry(job, it, conv, checklist, llm) {
         lastCall = Math.max(Date.now(), lastCall + MIN_INTERVAL);
         if (wait > 0) await sleep(wait);
       }
-      const rec = await evaluate({ group: job.group_id, conv, checklist, llm });
+      const rec = await evaluate({ group: job.group_id, conv, checklist, llm, runs: job.runs });
       it.status = 'done';
       it.error = null;
       it.total = rec.final_score.total;
@@ -156,5 +157,5 @@ export async function retryFailed(id, { llm } = {}) {
   if (old.status === 'running') throw httpError(409, 'job is still running');
   const ids = old.items.filter((it) => it.status === 'error' || it.status === 'pending').map((it) => it.conversation_id);
   if (!ids.length) throw httpError(400, 'nothing to retry');
-  return startBatch({ group: old.group_id, checklistId: old.checklist.id, onlyMissing: false, concurrency: old.concurrency, ids, llm });
+  return startBatch({ group: old.group_id, checklistId: old.checklist.id, onlyMissing: false, concurrency: old.concurrency, ids, llm, runs: old.runs });
 }

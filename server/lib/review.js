@@ -38,6 +38,10 @@ export function computeReviewFlags(rec, conv, checklist) {
       flags.push({ criterion_id: c.id, code: 'hedged', message: 'Модель сомневается в своём выводе — проверьте ответ.' });
     }
   }
+  for (const c of rec.criteria) {
+    if (c.votes && c.votes.agree < c.votes.total)
+      flags.push({ criterion_id: c.id, code: 'split_vote', message: `Прогоны модели разошлись (${c.votes.agree}/${c.votes.total} за итоговый ответ) — проверьте.` });
+  }
   if (rec.repairs > 0) flags.push({ criterion_id: null, code: 'repaired', message: `Ответ модели исправлялся ${rec.repairs} раз(а) после проверки кодом.` });
   const primary = providerInfo().model;
   if (rec.model && primary && String(rec.model).replace(/^models\//, '') !== primary)

@@ -110,7 +110,7 @@ async function runPart(sub, conv, facts, { llm, audio }) {
  * source "audio" go in a second call with the recording attached, or get N/A
  * in code when the dialogue has no recording.
  */
-export async function runModel(checklist, conv, { llm = complete, getAudio } = {}) {
+async function runOnce(checklist, conv, { llm = complete, getAudio } = {}) {
   const facts = computeFacts(conv);
   const textK = checklist.criteria.filter((k) => k.source !== 'audio');
   const audioK = checklist.criteria.filter((k) => k.source === 'audio');
@@ -144,12 +144,53 @@ export async function runModel(checklist, conv, { llm = complete, getAudio } = {
   };
 }
 
+/**
+ * Majority vote over several independent runs (EVAL_RUNS, default 1).
+ * Binary/flag/N/A: most frequent answer; scales: the median step. The
+ * explanation and evidence come from the first run that gave the final
+ * answer. Each criterion records its vote, e.g. "2/3".
+ */
+export function combineRuns(checklist, runs) {
+  if (runs.length === 1) return runs[0];
+  const criteria = checklist.criteria.map((k) => {
+    const all = runs.map((r) => r.criteria.find((c) => c.id === k.id));
+    const answers = all.map((c) => c.answer);
+    let final;
+    const counts = new Map();
+    for (const a of answers) counts.set(a, (counts.get(a) || 0) + 1);
+    const top = [...counts.entries()].sort((x, y) => y[1] - x[1]);
+    if (k.type === 'scale' && top[0][1] <= runs.length / 2) {
+      const nums = answers.filter((a) => typeof a === 'number').sort((x, y) => x - y);
+      final = nums.length > runs.length / 2 ? nums[Math.floor((nums.length - 1) / 2)] : top[0][0];
+    } else final = top[0][0];
+    const pick = all.find((c) => c.answer === final);
+    const agreeing = answers.filter((a) => a === final).length;
+    return { ...pick, votes: { agree: agreeing, total: runs.length, answers } };
+  });
+  const sum = (key) => runs.reduce((s, r) => s + r.usage[key], 0);
+  return {
+    criteria,
+    usage: { input: sum('input'), output: sum('output'), calls: sum('calls') },
+    model: runs[0].model,
+    facts: runs[0].facts,
+    prompt_chars: runs[0].prompt_chars,
+    repairs: runs.reduce((s, r) => s + r.repairs, 0),
+    runs: runs.length,
+  };
+}
+
+export async function runModel(checklist, conv, opts = {}) {
+  const n = Math.max(1, Math.min(7, Number(opts.runs ?? process.env.EVAL_RUNS ?? 1) || 1));
+  const runs = await Promise.all(Array.from({ length: n }, () => runOnce(checklist, conv, opts)));
+  return combineRuns(checklist, runs);
+}
+
 const evalDir = (group) => p('evaluations', safeId(group));
 const evalFile = (group, convId, checklistId) => `${evalDir(group)}/${safeId(convId)}__${safeId(checklistId)}.json`;
 
-export async function evaluate({ group, conv, checklist, llm, getAudio }) {
+export async function evaluate({ group, conv, checklist, llm, getAudio, runs }) {
   const started = Date.now();
-  const run = await runModel(checklist, conv, { llm, getAudio: getAudio ?? ((c) => getAudioBytes(group, c)) });
+  const run = await runModel(checklist, conv, { llm, runs, getAudio: getAudio ?? ((c) => getAudioBytes(group, c)) });
   const answers = Object.fromEntries(run.criteria.map((c) => [c.id, c.answer]));
   const result = score(checklist, answers);
   const price = pricing();
@@ -166,6 +207,7 @@ export async function evaluate({ group, conv, checklist, llm, getAudio }) {
     duration_ms: Date.now() - started,
     usage: run.usage,
     repairs: run.repairs,
+    runs: run.runs || 1,
     cost_usd_estimate: price.in == null || price.out == null ? null : round6((run.usage.input * price.in + run.usage.output * price.out) / 1e6),
     facts: run.facts,
     criteria: run.criteria,
