@@ -10,20 +10,24 @@ export async function render(root, ctx, id) {
   const list = await api.get('/api/checklists');
   if (!id) id = list[0]?.id;
   const side = h('aside.cl-side',
-    h('h3', 'Чек-листы'),
+    h('h2', 'Чек-листы'),
     h('ul.cl-list', list.map((c) =>
       h('li', { class: c.id === id ? 'on' : '' },
-        h('a', { href: `#/checklists/${enc(c.id)}` }, c.name),
+        h('a', { href: `#/checklists/${enc(c.id)}`, 'aria-current': c.id === id ? 'page' : null }, c.name),
         h('small', `v${c.version} · ${c.criteria} крит.`)))),
     h('button.btn', { onclick: () => newChecklist(list) }, '+ Новый чек-лист'),
   );
-  const main = h('section.cl-main');
+  const main = h('section.cl-main', { 'aria-label': 'Редактор чек-листа' });
   mount(root, h('div.cl-layout', side, main));
-  if (!id) return mount(main, h('p.muted', 'Чек-листов пока нет.'));
+  if (!id) return mount(main,
+    h('div.page-head',
+      h('div', h('h1', { tabindex: -1 }, 'Редактор чек-листов'), h('p.muted', 'Настройте критерии оценки без изменений в коде.'))),
+    h('div.empty-state', h('h2', 'Чек-листов пока нет'), h('p', 'Создайте первый чек-лист, чтобы начать оценивать диалоги.'), h('button.btn.primary', { onclick: () => newChecklist(list) }, 'Создать чек-лист')),
+  );
   try {
     const doc = await api.get(`/api/checklists/${enc(id)}`);
     const versions = await api.get(`/api/checklists/${enc(id)}/versions`);
-    editor(main, doc, versions);
+    editor(main, doc, versions, root, ctx);
   } catch (e) {
     mount(main, errorBox(e));
   }
@@ -46,9 +50,9 @@ async function newChecklist(list) {
   }
 }
 
-function editor(root, original, versions) {
+function editor(root, original, versions, pageRoot, ctx) {
   const doc = structuredClone(original);
-  const status = h('div.cl-status');
+  const status = h('div.cl-status', { role: 'status', 'aria-live': 'polite' });
   const body = h('div');
 
   function refresh() {
@@ -69,7 +73,7 @@ function editor(root, original, versions) {
     try {
       const saved = await api.put(`/api/checklists/${enc(doc.id)}`, { ...doc, version_note: note });
       toast(`Сохранено: версия ${saved.version}`);
-      render(document.getElementById('cqa-view'), null, doc.id);
+      await render(pageRoot, ctx, doc.id);
     } catch (e) {
       toast(e.message, 'err');
     }
@@ -87,11 +91,15 @@ function editor(root, original, versions) {
   }
 
   async function restore(v) {
-    const old = await api.get(`/api/checklists/${enc(doc.id)}?version=${v}`);
-    if (!confirm(`Восстановить версию ${v}? Будет создана новая версия с её содержимым.`)) return;
-    await api.put(`/api/checklists/${enc(doc.id)}`, { ...old, version_note: `Восстановлено из v${v}` });
-    toast('Версия восстановлена');
-    render(document.getElementById('cqa-view'), null, doc.id);
+    try {
+      const old = await api.get(`/api/checklists/${enc(doc.id)}?version=${v}`);
+      if (!confirm(`Восстановить версию ${v}? Будет создана новая версия с её содержимым.`)) return;
+      await api.put(`/api/checklists/${enc(doc.id)}`, { ...old, version_note: `Восстановлено из v${v}` });
+      toast('Версия восстановлена');
+      await render(pageRoot, ctx, doc.id);
+    } catch (e) {
+      toast(e.message, 'err');
+    }
   }
 
   const bind = (obj, key, cast = (v) => v) => ({
@@ -111,6 +119,7 @@ function editor(root, original, versions) {
         h('summary', `Общие правила оценки (${doc.global_rules?.length || 0}) — попадают в промпт`),
         h('textarea', {
           rows: 8,
+          'aria-label': 'Общие правила оценки, по одному правилу на строку',
           value: (doc.global_rules || []).join('\n'),
           oninput: (e) => {
             doc.global_rules = e.target.value.split('\n').map((s) => s.trim()).filter(Boolean);
@@ -122,9 +131,9 @@ function editor(root, original, versions) {
         h('summary', `Секции (${doc.sections?.length || 0})`),
         (doc.sections || []).map((s, i) =>
           h('div.row',
-            h('input', { ...bind(s, 'id'), placeholder: 'id', style: { maxWidth: '9rem' } }),
-            h('input', { ...bind(s, 'title'), placeholder: 'Название секции' }),
-            h('button.btn.ghost', { onclick: () => { doc.sections.splice(i, 1); draw(); } }, '✕'))),
+            h('input', { ...bind(s, 'id'), placeholder: 'id', 'aria-label': `ID секции ${i + 1}`, style: { maxWidth: '9rem' } }),
+            h('input', { ...bind(s, 'title'), placeholder: 'Название секции', 'aria-label': `Название секции ${i + 1}` }),
+            h('button.btn.ghost', { 'aria-label': `Удалить секцию ${s.title || s.id || i + 1}`, onclick: () => { doc.sections.splice(i, 1); draw(); } }, '✕'))),
         h('button.btn', { onclick: () => { (doc.sections ||= []).push({ id: `s${doc.sections.length + 1}`, title: '' }); draw(); } }, '+ Секция')),
       h('h3', 'Критерии'),
       doc.criteria.map((k, i) => criterionCard(k, i)),
@@ -143,13 +152,14 @@ function editor(root, original, versions) {
     k.na ||= { allowed: false, condition: '' };
     return h('div.crit',
       h('div.crit-head',
-        h('input.id', { ...bind(k, 'id'), title: 'ID критерия' }),
-        h('input.title', { ...bind(k, 'title'), placeholder: 'Название критерия' }),
+        h('input.id', { ...bind(k, 'id'), title: 'ID критерия', 'aria-label': `ID критерия ${i + 1}` }),
+        h('input.title', { ...bind(k, 'title'), placeholder: 'Название критерия', 'aria-label': `Название критерия ${k.id || i + 1}` }),
         h('div.crit-tools',
-          h('button.btn.ghost', { title: 'Выше', onclick: () => move(-1) }, '↑'),
-          h('button.btn.ghost', { title: 'Ниже', onclick: () => move(1) }, '↓'),
+          h('button.btn.ghost', { title: 'Выше', 'aria-label': `Переместить критерий ${k.id} выше`, onclick: () => move(-1) }, '↑'),
+          h('button.btn.ghost', { title: 'Ниже', 'aria-label': `Переместить критерий ${k.id} ниже`, onclick: () => move(1) }, '↓'),
           h('button.btn.ghost.danger', {
             title: 'Удалить критерий',
+            'aria-label': `Удалить критерий ${k.id}`,
             onclick: () => { if (confirm(`Удалить критерий ${k.id}?`)) { doc.criteria.splice(i, 1); draw(); } },
           }, '✕'))),
       h('div.grid4',
@@ -179,9 +189,9 @@ function editor(root, original, versions) {
       k.type === 'scale' && h('div.steps',
         h('div.muted', 'Ступени шкалы (верхняя даёт полный вес)'),
         k.scale.steps.map((s, si) => h('div.row',
-          h('input', { type: 'number', min: 0, step: 'any', style: { maxWidth: '6rem' }, ...bind(s, 'value', Number) }),
-          h('input', { ...bind(s, 'label'), placeholder: 'Описание ступени' }),
-          h('button.btn.ghost', { onclick: () => { k.scale.steps.splice(si, 1); draw(); } }, '✕'))),
+          h('input', { type: 'number', min: 0, step: 'any', 'aria-label': `Значение ступени ${si + 1} критерия ${k.id}`, style: { maxWidth: '6rem' }, ...bind(s, 'value', Number) }),
+          h('input', { ...bind(s, 'label'), placeholder: 'Описание ступени', 'aria-label': `Описание ступени ${si + 1} критерия ${k.id}` }),
+          h('button.btn.ghost', { 'aria-label': `Удалить ступень ${si + 1} критерия ${k.id}`, onclick: () => { k.scale.steps.splice(si, 1); draw(); } }, '✕'))),
         h('button.btn', { onclick: () => { k.scale.steps.push({ value: 0, label: '' }); draw(); } }, '+ Ступень')),
       h('label', 'Пояснения для оценщика (уточнения правил, попадают в промпт)',
         h('textarea', { rows: 2, ...bind(k, 'guidance') })),
@@ -189,18 +199,20 @@ function editor(root, original, versions) {
   }
 
   mount(root,
-    h('div.cl-toolbar',
-      h('h2', doc.name, h('small', ` · ${doc.id} · версия ${doc.version}`)),
+    h('div.cl-toolbar.page-head',
+      h('div',
+        h('h1', { tabindex: -1 }, doc.name),
+        h('p.muted', `${doc.id} · версия ${doc.version}. Изменения сохраняются новой неизменяемой версией.`)),
       h('div.row', saveBtn, h('button.btn.ghost.danger', { onclick: del }, 'Удалить чек-лист'))),
     status,
     body,
     h('details.box',
       h('summary', `История версий (${versions.length})`),
-      h('table.tbl',
+      h('div.table-scroll', { tabindex: 0, role: 'region', 'aria-label': 'История версий чек-листа' }, h('table.tbl',
         h('tr', h('th', 'Версия'), h('th', 'Сохранено'), h('th', 'Комментарий'), h('th', '')),
         versions.slice().reverse().map((v) => h('tr',
           h('td', `v${v.version}`), h('td', fmtDate(v.saved_at)), h('td', v.note || ''),
-          h('td', v.version === doc.version ? h('span.muted', 'текущая') : h('button.btn.ghost', { onclick: () => restore(v.version) }, 'Восстановить')))))),
+          h('td', v.version === doc.version ? h('span.muted', 'текущая') : h('button.btn.ghost', { onclick: () => restore(v.version) }, 'Восстановить'))))))),
   );
   draw();
 }

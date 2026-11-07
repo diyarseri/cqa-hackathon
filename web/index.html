@@ -3,28 +3,88 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>CQA — оценка качества диалогов</title>
+  <meta name="theme-color" content="#0b2f26">
+  <meta name="description" content="Рабочее пространство для оценки качества диалогов Freedom Broker">
+  <title>Conversation Quality — Freedom Broker</title>
+  <script>
+    try {
+      const savedTheme = localStorage.getItem('cqa.theme');
+      const systemDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+      document.documentElement.dataset.theme = savedTheme || (systemDark ? 'dark' : 'light');
+    } catch {}
+  </script>
   <link rel="stylesheet" href="css/app.css">
 </head>
 <body>
   <!-- Root container. In Dynamics 365 the same modules mount into a web resource div. -->
   <div id="cqa-app" class="cqa">
+    <a class="skip-link" href="#cqa-view">Перейти к содержимому</a>
+
     <header class="cqa-top">
-      <a class="brand" href="#/">CQA <span>Freedom Broker</span></a>
-      <nav class="tabs" id="cqa-nav">
-        <a href="#/insights" data-tab="insights">Аналитика</a>
-        <a href="#/" data-tab="dialogs">Диалоги</a>
-        <a href="#/batch" data-tab="batch">Пакетная оценка</a>
-        <a href="#/checklists" data-tab="checklists">Чек-листы</a>
-        <a href="#/appeals" data-tab="appeals">Апелляции</a>
-        <a href="#/validation" data-tab="validation">Валидация</a>
-      </nav>
-      <label class="group-pick">Набор
-        <select id="cqa-group"></select>
-      </label>
+      <div class="cqa-topbar">
+        <a class="brand" href="#/" aria-label="Conversation Quality, главная">
+          <span class="brand-mark" aria-hidden="true"><span>CQ</span></span>
+          <span class="brand-copy">
+            <strong>Conversation Quality</strong>
+            <small>Freedom Broker</small>
+          </span>
+        </a>
+
+        <nav class="tabs" id="cqa-nav" aria-label="Основная навигация">
+          <a href="#/insights" data-tab="insights">Аналитика</a>
+          <a href="#/" data-tab="dialogs">Диалоги</a>
+          <a href="#/batch" data-tab="batch">Пакетная оценка</a>
+          <a href="#/checklists" data-tab="checklists">Чек-листы</a>
+          <a href="#/appeals" data-tab="appeals">Апелляции</a>
+          <a href="#/validation" data-tab="validation">Валидация</a>
+        </nav>
+
+        <div class="top-actions">
+          <div id="cqa-connection" class="connection pending" role="status" aria-live="polite">
+            <span class="connection-dot" aria-hidden="true"></span>
+            <span class="connection-label">Подключение</span>
+          </div>
+
+          <button id="cqa-command-open" class="icon-action command-open" type="button"
+                  aria-label="Быстрый переход" aria-keyshortcuts="Control+K Meta+K" title="Быстрый переход (Ctrl/⌘ + K)">
+            <span aria-hidden="true">⌘K</span>
+          </button>
+
+          <button id="cqa-theme" class="icon-action" type="button" aria-label="Переключить тему" title="Переключить тему">
+            <span class="theme-glyph" aria-hidden="true">◐</span>
+          </button>
+
+          <label class="group-pick" for="cqa-group">
+            <span>Набор</span>
+            <select id="cqa-group" aria-label="Выбранный набор данных"></select>
+          </label>
+        </div>
+      </div>
     </header>
-    <main id="cqa-view" class="cqa-view" aria-live="polite"></main>
-    <div id="cqa-toast" class="toast" role="status" hidden></div>
+
+    <main id="cqa-view" class="cqa-view" tabindex="-1"></main>
+    <div id="cqa-toast" class="toast" role="status" aria-live="polite" hidden></div>
+
+    <dialog id="cqa-command" class="command-dialog" aria-labelledby="cqa-command-title">
+      <div class="command-shell">
+        <div class="command-heading">
+          <div>
+            <strong id="cqa-command-title">Быстрый переход</strong>
+            <small>Раздел или ID диалога</small>
+          </div>
+          <button class="command-close" type="button" aria-label="Закрыть">×</button>
+        </div>
+        <label class="command-search">
+          <span class="sr-only">Поиск команды или диалога</span>
+          <span aria-hidden="true">⌕</span>
+          <input id="cqa-command-input" type="search" autocomplete="off"
+                 placeholder="Например: аналитика или dialog_123">
+          <kbd>Esc</kbd>
+        </label>
+        <div id="cqa-command-list" class="command-list"></div>
+        <p class="command-hint">Введите ID и нажмите Enter, чтобы открыть диалог в выбранном наборе.</p>
+      </div>
+    </dialog>
   </div>
   <script type="module" src="js/app.js"></script>
 </body>

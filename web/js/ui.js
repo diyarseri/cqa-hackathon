@@ -17,6 +17,7 @@ export function h(tag, attrs, ...children) {
     if (k.startsWith('on')) el.addEventListener(k.slice(2), v);
     else if (k === 'class') el.className = v;
     else if (k === 'style' && typeof v === 'object') Object.assign(el.style, v);
+    else if (k.startsWith('aria-') && typeof v === 'boolean') el.setAttribute(k, String(v));
     else if (k in el && k !== 'list' && k !== 'form') el[k] = v;
     else el.setAttribute(k, v === true ? '' : v);
   }
@@ -38,13 +39,29 @@ export function mount(el, ...children) {
 }
 
 let toastTimer;
+let toastHideTimer;
 export function toast(msg, kind = 'ok') {
   const t = document.getElementById('cqa-toast');
-  t.textContent = msg;
-  t.className = `toast ${kind}`;
-  t.hidden = false;
   clearTimeout(toastTimer);
-  toastTimer = setTimeout(() => (t.hidden = true), kind === 'err' ? 7000 : 3500);
+  clearTimeout(toastHideTimer);
+  mount(t,
+    h('span.toast-icon', { 'aria-hidden': true }, kind === 'err' ? '!' : '✓'),
+    h('span.toast-copy', msg),
+    h('button.toast-close', { type: 'button', 'aria-label': 'Закрыть уведомление', onclick: hideToast }, '×'),
+  );
+  t.className = `toast ${kind}`;
+  t.setAttribute('role', kind === 'err' ? 'alert' : 'status');
+  t.setAttribute('aria-live', kind === 'err' ? 'assertive' : 'polite');
+  t.hidden = false;
+  requestAnimationFrame(() => t.classList.add('show'));
+  toastTimer = setTimeout(hideToast, kind === 'err' ? 7000 : 4000);
+}
+
+function hideToast() {
+  const t = document.getElementById('cqa-toast');
+  if (!t || t.hidden) return;
+  t.classList.remove('show');
+  toastHideTimer = setTimeout(() => { t.hidden = true; }, reducedMotion() ? 0 : 180);
 }
 
 export function fmtScore(x) {
@@ -62,15 +79,70 @@ export function answerLabel(a) {
 export function fmtDate(iso) {
   if (!iso) return '';
   const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return String(iso);
   return d.toLocaleString('ru-RU', { dateStyle: 'short', timeStyle: 'short' });
 }
 
 export const SPEAKERS = { client: 'Клиент', operator: 'Оператор', bot: 'Бот', system: 'Система' };
 
 export function errorBox(e) {
-  return h('div.alert.err', String(e?.message || e));
+  return h('div.alert.err', { role: 'alert' },
+    h('span.alert-mark', { 'aria-hidden': true }, '!'),
+    h('span', String(e?.message || e)),
+  );
 }
 
 export function loading(text = 'Загрузка…') {
-  return h('div.loading', text);
+  return h('div.loading', { role: 'status', 'aria-live': 'polite' },
+    h('span.loader', { 'aria-hidden': true }),
+    h('span', text),
+  );
+}
+
+export function reducedMotion() {
+  return window.matchMedia?.('(prefers-reduced-motion: reduce)').matches ?? false;
+}
+
+// Apply shared responsive and keyboard behavior without coupling each feature
+// module to the application shell.
+export function enhanceView(root) {
+  root.querySelectorAll('table.tbl').forEach((table) => {
+    let wrap = table.parentElement;
+    if (!wrap?.classList.contains('table-scroll')) {
+      wrap = h('div.table-scroll');
+      table.before(wrap);
+      wrap.append(table);
+    }
+    if (!wrap.hasAttribute('role')) wrap.setAttribute('role', 'region');
+    if (!wrap.hasAttribute('aria-label')) wrap.setAttribute('aria-label', table.getAttribute('aria-label') || 'Таблица данных');
+    if (!wrap.dataset.autoTabstop) wrap.dataset.autoTabstop = wrap.hasAttribute('tabindex') ? 'false' : 'true';
+    const updateTabStop = () => {
+      if (wrap.dataset.autoTabstop !== 'true') return;
+      if (table.scrollWidth > wrap.clientWidth + 1) wrap.tabIndex = 0;
+      else wrap.removeAttribute('tabindex');
+    };
+    requestAnimationFrame(updateTabStop);
+    if (!wrap.dataset.resizeReady && 'ResizeObserver' in window) {
+      wrap.dataset.resizeReady = 'true';
+      new ResizeObserver(updateTabStop).observe(wrap);
+    }
+  });
+
+  root.querySelectorAll('tr.click').forEach((row) => {
+    if (row.dataset.keyboardReady === 'true') return;
+    row.dataset.keyboardReady = 'true';
+    if (!row.hasAttribute('tabindex')) row.tabIndex = 0;
+    if (!row.hasAttribute('role')) row.setAttribute('role', 'link');
+    if (!row.hasAttribute('aria-label')) row.setAttribute('aria-label', row.textContent.trim());
+    row.addEventListener('keydown', (event) => {
+      if (event.target.closest('a,button,input,select,textarea')) return;
+      if (event.key !== 'Enter' && event.key !== ' ') return;
+      event.preventDefault();
+      row.click();
+    });
+  });
+
+  root.querySelectorAll('a[target="_blank"]').forEach((link) => {
+    link.rel = 'noopener noreferrer';
+  });
 }
