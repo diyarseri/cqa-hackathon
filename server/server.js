@@ -3,6 +3,7 @@ import path from 'node:path';
 import { Router } from './http.js';
 import { loadDotEnv, PROJECT_ROOT, httpError } from './lib/store.js';
 import * as ds from './lib/datasource.js';
+import * as cl from './lib/checklists.js';
 
 loadDotEnv();
 const app = new Router();
@@ -39,6 +40,15 @@ app.get('/api/groups/:group/conversations/:id/audio', async ({ params, res }) =>
   res.writeHead(302, { location: src, 'cache-control': 'no-store' });
   res.end();
 });
+
+// ---- Step 2: checklists (every save is a new immutable version) ---------------
+cl.seedDefault();
+app.get('/api/checklists', ({ query }) => cl.list({ includeDeleted: query.get('deleted') === '1' }));
+app.post('/api/checklists', ({ body }) => cl.create(body));
+app.get('/api/checklists/:id', ({ params, query }) => cl.get(params.id, query.get('version')));
+app.put('/api/checklists/:id', ({ params, body }) => cl.update(params.id, body));
+app.delete('/api/checklists/:id', ({ params }) => cl.remove(params.id));
+app.get('/api/checklists/:id/versions', ({ params }) => cl.history(params.id));
 
 // ---- static UI ----------------------------------------------------------------
 app.static('/shared/', path.join(PROJECT_ROOT, 'shared')); // pure modules shared with the browser
