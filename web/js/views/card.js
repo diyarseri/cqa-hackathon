@@ -163,7 +163,8 @@ class CardView {
     const pts = k.type === 'flag' ? 'без баллов' : s?.applicable ? `${fmtScore(s.points)} из ${fmtScore(s.effective_weight)} (вес ${k.weight})` : `N/A · вес ${k.weight} перераспределён`;
     const stepLabel = k.type === 'scale' && typeof a === 'number' ? k.scale.steps.find((x) => x.value === a)?.label : null;
     return h('div.res', { id: `r-${k.id}` },
-      h('div.res-head', h('span.t', `${k.id}. ${k.title}`), h(`span.ans.${cls}`, label), h('span.pts', pts)),
+      h('div.res-head', h('span.t', `${k.id}. ${k.title}`), h(`span.ans.${cls}`, label), h('span.pts', pts),
+        r.votes ? h('span.muted', { title: `Ответы прогонов: ${r.votes.answers.map(answerLabel).join(', ')}` }, `голоса ${r.votes.agree}/${r.votes.total}`) : null),
       stepLabel && h('div.muted', stepLabel),
       (this.evaluation.review_flags || []).filter((f) => f.criterion_id === k.id).map((f) => h('div.flag-review', '⚑ ', f.message)),
       h('p', r.explanation),
