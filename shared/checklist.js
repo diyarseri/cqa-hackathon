@@ -7,59 +7,59 @@ export const SOURCE_LABELS = { transcript: 'Транскрипт', audio: 'За�
 /** Returns a list of human-readable problems; empty list = valid. */
 export function validateChecklist(c) {
   const errs = [];
-  if (!c || typeof c !== 'object') return ['checklist must be an object'];
-  if (!str(c.name)) errs.push('name is required');
-  if (c.total_points != null && !(c.total_points > 0)) errs.push('total_points must be > 0');
+  if (!c || typeof c !== 'object') return ['чек-лист должен быть объектом'];
+  if (!str(c.name)) errs.push('нужно название чек-листа');
+  if (c.total_points != null && !(c.total_points > 0)) errs.push('максимум баллов должен быть больше 0');
   if (c.rounding != null && !(Number.isInteger(c.rounding) && c.rounding >= 0 && c.rounding <= 6))
-    errs.push('rounding must be an integer 0..6');
+    errs.push('округление — целое число от 0 до 6');
   const sections = Array.isArray(c.sections) ? c.sections : [];
   const sectionIds = new Set();
   for (const s of sections) {
-    if (!str(s.id)) errs.push('every section needs an id');
-    else if (sectionIds.has(s.id)) errs.push(`duplicate section id ${s.id}`);
+    if (!str(s.id)) errs.push('у каждой секции нужен id');
+    else if (sectionIds.has(s.id)) errs.push(`секция ${s.id} повторяется`);
     sectionIds.add(s.id);
-    if (!str(s.title)) errs.push(`section ${s.id}: title is required`);
+    if (!str(s.title)) errs.push(`секция ${s.id}: нужно название`);
   }
   if (!Array.isArray(c.criteria) || c.criteria.length === 0) {
-    errs.push('at least one criterion is required');
+    errs.push('нужен хотя бы один критерий');
     return errs;
   }
   const ids = new Set();
   for (const k of c.criteria) {
-    const at = `criterion ${k.id ?? '?'}`;
-    if (!str(k.id) || !/^[A-Za-z0-9_-]{1,20}$/.test(k.id)) errs.push(`${at}: id must be 1–20 letters/digits`);
-    else if (ids.has(k.id)) errs.push(`duplicate criterion id ${k.id}`);
+    const at = `Критерий ${k.id ?? '?'}`;
+    if (!str(k.id) || !/^[A-Za-z0-9_-]{1,20}$/.test(k.id)) errs.push(`${at}: ID — от 1 до 20 латинских букв или цифр`);
+    else if (ids.has(k.id)) errs.push(`ID ${k.id} повторяется`);
     ids.add(k.id);
-    if (!str(k.title)) errs.push(`${at}: title is required`);
-    if (!str(k.description)) errs.push(`${at}: wording (description) is required`);
-    if (!TYPES.includes(k.type)) errs.push(`${at}: type must be one of ${TYPES.join(', ')}`);
+    if (!str(k.title)) errs.push(`${at}: нужно название`);
+    if (!str(k.description)) errs.push(`${at}: нужна формулировка`);
+    if (!TYPES.includes(k.type)) errs.push(`${at}: неизвестный тип ответа`);
     if (k.section != null && sections.length && !sectionIds.has(k.section))
-      errs.push(`${at}: unknown section ${k.section}`);
+      errs.push(`${at}: секция ${k.section} не существует`);
     if (k.type === 'flag') {
-      if (k.weight && k.weight !== 0) errs.push(`${at}: a flag has no weight`);
+      if (k.weight && k.weight !== 0) errs.push(`${at}: у флага не бывает веса`);
     } else if (!(typeof k.weight === 'number' && k.weight > 0)) {
-      errs.push(`${at}: weight must be a number > 0`);
+      errs.push(`${at}: вес должен быть числом больше 0`);
     }
     if (k.type === 'scale') {
       const steps = k.scale?.steps;
-      if (!Array.isArray(steps) || steps.length < 2) errs.push(`${at}: a scale needs at least 2 steps`);
+      if (!Array.isArray(steps) || steps.length < 2) errs.push(`${at}: у шкалы нужно хотя бы 2 ступени`);
       else {
         const vals = steps.map((s) => s.value);
         if (vals.some((v) => typeof v !== 'number' || !Number.isFinite(v) || v < 0))
-          errs.push(`${at}: scale step values must be numbers ≥ 0`);
-        if (new Set(vals).size !== vals.length) errs.push(`${at}: scale step values must be unique`);
-        if (!(Math.max(...vals) > 0)) errs.push(`${at}: the top scale step must be > 0`);
-        if (steps.some((s) => !str(s.label))) errs.push(`${at}: every scale step needs a label`);
+          errs.push(`${at}: значения ступеней — числа ≥ 0`);
+        if (new Set(vals).size !== vals.length) errs.push(`${at}: значения ступеней не должны повторяться`);
+        if (!(Math.max(...vals) > 0)) errs.push(`${at}: верхняя ступень должна быть больше 0`);
+        if (steps.some((s) => !str(s.label))) errs.push(`${at}: у каждой ступени нужно описание`);
       }
     }
-    if (k.source != null && !['transcript', 'audio'].includes(k.source)) errs.push(`${at}: source must be transcript or audio`);
-    if (k.source === 'audio' && !k.na?.allowed) errs.push(`${at}: an audio criterion must allow N/A (chats have no recording)`);
+    if (k.source != null && !['transcript', 'audio'].includes(k.source)) errs.push(`${at}: источник — транскрипт или запись`);
+    if (k.source === 'audio' && !k.na?.allowed) errs.push(`${at}: критерий по записи должен допускать N/A (у чатов нет записи)`);
     if (k.na?.allowed) {
-      if (k.type === 'flag') errs.push(`${at}: a flag cannot be N/A`);
-      if (!str(k.na.condition)) errs.push(`${at}: N/A is allowed, so the N/A condition text is required`);
+      if (k.type === 'flag') errs.push(`${at}: флаг не может быть N/A`);
+      if (!str(k.na.condition)) errs.push(`${at}: N/A разрешён — нужно условие N/A`);
     }
   }
-  if (!c.criteria.some((k) => k.type !== 'flag')) errs.push('at least one weighted criterion is required');
+  if (!c.criteria.some((k) => k.type !== 'flag')) errs.push('нужен хотя бы один критерий с весом');
   return errs;
 }
 

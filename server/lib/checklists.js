@@ -77,7 +77,7 @@ function save(id, body, { note = '' } = {}) {
   delete doc.version_note;
   doc.id = id;
   const errs = validateChecklist(doc);
-  if (errs.length) throw httpError(400, 'Checklist is invalid: ' + errs.join('; '));
+  if (errs.length) throw httpError(400, 'Чек-лист не сохранён: ' + errs.join('; '));
   const next = (versions(id).at(-1) || 0) + 1;
   const out = { ...doc, version: next, saved_at: new Date().toISOString(), version_note: note };
   writeJson(path.join(dir(id), `v${next}.json`), out);

@@ -15,6 +15,7 @@ const cachePath = (g) => p('cache', `${safeId(g)}.json`);
 
 /** Fetch a dataset group from the API and cache the raw response on disk. */
 export async function fetchGroup(groupId, { attempts = 4 } = {}) {
+  if (readJson(cachePath(groupId))?.uploaded) throw httpError(400, `Набор ${groupId} загружен вручную — его нет в API организаторов`);
   let lastErr;
   for (let i = 0; i < attempts; i++) {
     try {
@@ -101,4 +102,52 @@ export async function getAudioBytes(group, conv) {
   fs.mkdirSync(p('audio', safeId(group)), { recursive: true });
   fs.writeFileSync(file, buf);
   return buf;
+}
+
+// --- manual upload ---------------------------------------------------------
+// Accepts the API format or anything simpler: {data:{records}}, {records},
+// an array of records, one record, or a bare transcript array.
+export function parseUpload(body, { fileName = 'dialog' } = {}) {
+  let records;
+  if (Array.isArray(body?.data?.records)) records = body.data.records;
+  else if (Array.isArray(body?.records)) records = body.records;
+  else if (Array.isArray(body) && body.length && Array.isArray(body[0]?.transcript)) records = body;
+  else if (Array.isArray(body?.transcript)) records = [body];
+  else if (Array.isArray(body) && body.length && 'text' in (body[0] || {})) records = [{ transcript: body }];
+  else throw httpError(400, 'Не похоже на диалог: нужен JSON с полем transcript (как в API организаторов) или массив реплик {timestamp, speaker, text}.');
+  const base = String(fileName).replace(/\.[^.]+$/, '').replace(/[^A-Za-z0-9._-]+/g, '-').slice(0, 60) || 'dialog';
+  return records.map((r, i) => {
+    if (!Array.isArray(r?.transcript) || !r.transcript.length) throw httpError(400, `Запись ${i + 1}: пустой или отсутствующий transcript`);
+    r.transcript.forEach((m, j) => {
+      if (typeof m?.text !== 'string' && m?.text != null) throw httpError(400, `Запись ${i + 1}, реплика ${j + 1}: text должен быть строкой`);
+      if (!m?.speaker) throw httpError(400, `Запись ${i + 1}, реплика ${j + 1}: нет speaker (client, operator, bot или system)`);
+    });
+    const id = String(r.conversation_id || (records.length > 1 ? `${base}-${i + 1}` : base));
+    safeId(id);
+    return {
+      conversation_id: id,
+      channel: r.channel || (r.audio_url ? 'voice call' : 'agent chat'),
+      language: (r.language || 'RU').toUpperCase(),
+      transcript: r.transcript,
+      audio_url: r.audio_url || null,
+    };
+  });
+}
+
+/** Add or replace uploaded records in a local group (never sent to the organisers' API). */
+export function addUploaded(groupId, records) {
+  safeId(groupId);
+  const cached = readJson(cachePath(groupId)) || {
+    fetched_at: new Date().toISOString(), group_id: groupId, uploaded: true,
+    response: { error: '', isSuccess: true, data: { dataset_group_id: groupId, total_records: 0, records: [] } },
+  };
+  const list = cached.response.data.records;
+  for (const r of records) {
+    const i = list.findIndex((x) => x.conversation_id === r.conversation_id);
+    if (i >= 0) list[i] = r; else list.push(r);
+  }
+  cached.response.data.total_records = list.length;
+  cached.uploaded = cached.uploaded ?? true;
+  writeJson(cachePath(groupId), cached);
+  return { group_id: groupId, added: records.map((r) => r.conversation_id), total: list.length };
 }

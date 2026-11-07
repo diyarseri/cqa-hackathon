@@ -24,7 +24,7 @@ const rec = (audio) => normalizeRecord({ conversation_id: 'v', channel: audio ? 
 
 test('audio criteria must allow N/A', () => {
   const bad = structuredClone(voice); bad.criteria.at(-1).na = { allowed: false, condition: '' };
-  assert.match(validateChecklist(bad).join(' '), /audio criterion must allow N\/A/);
+  assert.match(validateChecklist(bad).join(' '), /должен допускать N\/A/);
   assert.deepEqual(validateChecklist(voice), []);
 });
 

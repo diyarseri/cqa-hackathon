@@ -26,6 +26,11 @@ app.post('/api/groups/:group/fetch', async ({ params }) => {
   return { group_id: params.group, fetched_at: g.fetched_at, total: g.response.data.records.length };
 });
 
+// Manual upload of one or more transcripts (JSON) into a local group.
+app.post('/api/groups/:group/upload', ({ params, body }) =>
+  ds.addUploaded(params.group, ds.parseUpload(body.data, { fileName: body.file_name })),
+);
+
 app.get('/api/groups/:group/conversations', async ({ params, query }) => {
   const list = await ds.getConversations(params.group, { refresh: query.get('refresh') === '1' });
   return list.map((c) => ({

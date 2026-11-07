@@ -26,9 +26,9 @@ test('validator catches broken configs', () => {
   bad.criteria[3].scale.steps[1].value = 20;
   bad.criteria.push({ ...bad.criteria[0] });
   const errs = validateChecklist(bad).join(' | ');
-  assert.match(errs, /N\/A condition text is required/);
-  assert.match(errs, /unique/);
-  assert.match(errs, /duplicate criterion id 01/);
+  assert.match(errs, /нужно условие N\/A/);
+  assert.match(errs, /не должны повторяться/);
+  assert.match(errs, /ID 01 повторяется/);
 });
 
 test('storage: every save is a new version, delete is soft', async () => {
@@ -43,7 +43,7 @@ test('storage: every save is a new version, delete is soft', async () => {
   assert.equal(v2.version, 2);
   assert.equal(cl.get('chat-quality', 1).criteria.length, 8);
   assert.equal(cl.get('chat-quality').criteria.length, 7);
-  assert.throws(() => cl.update('chat-quality', { ...edited, criteria: [] }), /invalid/);
+  assert.throws(() => cl.update('chat-quality', { ...edited, criteria: [] }), /не сохранён/);
   cl.remove('chat-quality');
   assert.equal(cl.list().length, 0);
   assert.equal(cl.get('chat-quality').version, 2); // history still readable

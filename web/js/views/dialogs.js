@@ -75,6 +75,9 @@ export async function render(root, ctx) {
           catch (e) { toast(e.message, 'err'); }
         },
       }, '⟳ Обновить из API'),
+      h('label.btn', { style: { flexDirection: 'row', margin: 0, color: 'var(--ink)', cursor: 'pointer' }, title: 'JSON в формате API организаторов, одна запись или массив реплик {timestamp, speaker, text}' },
+        '⬆ Загрузить диалог (JSON)',
+        h('input', { type: 'file', accept: '.json,application/json', multiple: true, hidden: true, onchange: (e) => uploadFiles(e.target, ctx) })),
       count,
     ),
     h('table.tbl',
@@ -82,4 +85,25 @@ export async function render(root, ctx) {
       tbody),
   );
   draw();
+}
+
+async function uploadFiles(input, ctx) {
+  const files = [...(input.files || [])];
+  if (!files.length) return;
+  const target = (prompt('В какой набор загрузить? (новое имя создаст отдельный набор)', ctx.group === 'DEV' ? 'UPLOAD' : ctx.group) || '').trim();
+  if (!target) return;
+  let added = [];
+  try {
+    for (const f of files) {
+      const r = await api.post(`/api/groups/${enc(target)}/upload`, { data: JSON.parse(await f.text()), file_name: f.name });
+      added = added.concat(r.added);
+    }
+    toast(`Загружено в набор ${target}: ${added.join(', ')}`);
+    try { localStorage.setItem('cqa.group', target); } catch {}
+    location.hash = added.length === 1 ? `#/c/${enc(added[0])}` : '#/';
+    location.reload();
+  } catch (e) {
+    toast(e instanceof SyntaxError ? `Файл не является JSON: ${e.message}` : e.message, 'err');
+  }
+  input.value = '';
 }
