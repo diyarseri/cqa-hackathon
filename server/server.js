@@ -7,6 +7,7 @@ import * as cl from './lib/checklists.js';
 import * as ev from './lib/evaluator.js';
 import * as ap from './lib/appeals.js';
 import * as batch from './lib/batch.js';
+import * as val from './lib/validation.js';
 import { computeFacts } from './lib/facts.js';
 import { buildSystemPrompt, buildUserPrompt } from './lib/prompt.js';
 import { providerInfo, pricing } from './lib/llm.js';
@@ -151,6 +152,16 @@ app.get('/api/groups/:group/results.csv', ({ params, query, res }) => {
   res.writeHead(200, { 'content-type': 'text/csv; charset=utf-8', 'content-disposition': `attachment; filename="cqa-${params.group}.csv"` });
   res.end('﻿' + lines.join('\n'));
 });
+
+// ---- Step 8: validation (human labels vs model) ----------------------------------
+app.get('/api/groups/:group/validation', ({ params, query }) => ({
+  suggested: params.group === 'DEV' ? val.SUGGESTED_DEV : [],
+  ...val.agreement(params.group, query.get('checklist') || 'chat-quality'),
+}));
+app.get('/api/groups/:group/conversations/:id/label', ({ params, query }) =>
+  val.getLabel(params.group, params.id, query.get('checklist') || 'chat-quality') || {},
+);
+app.put('/api/groups/:group/conversations/:id/label', ({ params, body }) => val.saveLabel(params.group, params.id, body));
 
 // ---- static UI ----------------------------------------------------------------
 app.static('/shared/', path.join(PROJECT_ROOT, 'shared')); // pure modules shared with the browser
