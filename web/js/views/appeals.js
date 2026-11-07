@@ -24,7 +24,7 @@ export async function render(root, ctx, appealId) {
         h('a.btn.primary', { href: '#/' }, 'Перейти к диалогам'))
       : h('div.table-scroll', { tabindex: 0, role: 'region', 'aria-label': 'Список апелляций' }, h('table.tbl',
         h('thead', h('tr', h('th', 'Статус'), h('th', 'Диалог'), h('th', 'Критерий'), h('th', 'Оспорено'), h('th', 'Комментарий'), h('th.num', 'Итог'), h('th', 'Подана'))),
-        h('tbody', all.map((a) => h('tr',
+        h('tbody', all.map((a) => h('tr.click', { onclick: () => (location.hash = `#/appeals/${enc(a.id)}`) },
           h('td', a.status === 'open' ? h('span.pill.warn', 'открыта') : a.status === 'changed' ? h('span.pill', 'изменена') : h('span.pill.na', 'подтверждена')),
           h('td', h('a.table-link', { href: `#/appeals/${enc(a.id)}`, 'aria-label': `Открыть апелляцию по диалогу ${a.conversation_id}, критерий ${a.criterion_id}` }, a.conversation_id)),
           h('td', a.criterion_id),

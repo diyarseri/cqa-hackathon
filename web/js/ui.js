@@ -8,7 +8,8 @@ export function h(tag, attrs, ...children) {
     if (part[0] === '.') el.classList.add(part.slice(1));
     else el.id = part.slice(1);
   }
-  if (attrs && (typeof attrs !== 'object' || attrs instanceof Node || Array.isArray(attrs))) {
+  // A number or string as the 2nd argument is content, including 0 (message #0).
+  if (attrs != null && attrs !== false && (typeof attrs !== 'object' || attrs instanceof Node || Array.isArray(attrs))) {
     children.unshift(attrs);
     attrs = null;
   }
