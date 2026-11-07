@@ -128,4 +128,3 @@ data/            (не в git) кэш наборов, чек-листы, оце�
 
 - План работы и обмен данными: [docs/PLAN.md](docs/PLAN.md)
 - Сценарий защиты: [docs/DEMO.md](docs/DEMO.md)
-- Текст выступления для двоих: [docs/SPEECH.md](docs/SPEECH.md)
