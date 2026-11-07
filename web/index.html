@@ -40,11 +40,6 @@
           <a href="#/appeals" data-tab="appeals">Спорные оценки</a>
           <a href="#/checklists" data-tab="checklists">Критерии оценки</a>
           <a href="#/validation" data-tab="validation">Проверка точности</a>
-          <div class="mobile-nav-tools" aria-label="Дополнительные действия">
-            <button id="cqa-command-mobile" type="button">Поиск</button>
-            <button id="cqa-help-mobile" type="button">Помощь</button>
-            <button id="cqa-theme-mobile" type="button">Тема</button>
-          </div>
         </nav>
 
         <div class="top-actions">
@@ -52,21 +47,36 @@
             <span class="connection-dot" aria-hidden="true"></span>
             <span class="connection-label sr-only">Подключение</span>
           </div>
-          <label class="group-pick" for="cqa-group">
-            <span>Набор данных</span>
-            <select id="cqa-group" aria-label="Выбранный набор данных"></select>
-          </label>
-          <label class="locale-pick" for="cqa-locale">
-            <span>Язык</span>
-            <select id="cqa-locale" aria-label="Язык интерфейса">
+          <div id="cqa-group-picker" class="header-picker group-pick">
+            <span class="picker-label">Набор данных</span>
+            <button id="cqa-group-trigger" class="picker-trigger" type="button" aria-haspopup="listbox" aria-expanded="false" aria-controls="cqa-group-menu">
+              <span id="cqa-group-value">DEV</span><span class="picker-chevron" aria-hidden="true">⌄</span>
+            </button>
+            <div id="cqa-group-menu" class="picker-menu" role="listbox" hidden></div>
+            <select id="cqa-group" class="sr-only" tabindex="-1" aria-hidden="true" aria-label="Выбранный набор данных"></select>
+          </div>
+          <div id="cqa-locale-picker" class="header-picker locale-pick">
+            <span class="picker-label">Язык</span>
+            <button id="cqa-locale-trigger" class="picker-trigger" type="button" aria-haspopup="listbox" aria-expanded="false" aria-controls="cqa-locale-menu">
+              <span id="cqa-locale-value">RU</span><span class="picker-chevron" aria-hidden="true">⌄</span>
+            </button>
+            <div id="cqa-locale-menu" class="picker-menu" role="listbox" hidden></div>
+            <select id="cqa-locale" class="sr-only" tabindex="-1" aria-hidden="true" aria-label="Язык интерфейса">
               <option value="ru">RU</option>
               <option value="kk">KZ</option>
               <option value="en">EN</option>
             </select>
-          </label>
-          <button id="cqa-command-open" class="header-tool" type="button" aria-label="Быстрый переход" title="Быстрый переход">Поиск</button>
-          <button id="cqa-help-open" class="header-help" type="button">Помощь</button>
-          <button id="cqa-theme" class="header-tool theme-tool" type="button" aria-label="Включить тёмную тему" title="Тёмная тема"><span class="theme-label">Тёмная тема</span><span class="theme-glyph" aria-hidden="true">◐</span></button>
+          </div>
+          <div id="cqa-utility" class="utility-wrap">
+            <button id="cqa-utility-toggle" class="utility-toggle" type="button" aria-haspopup="menu" aria-expanded="false" aria-controls="cqa-utility-menu">
+              <span class="utility-icon" aria-hidden="true">⚙</span><span class="utility-label">Инструменты</span><span class="picker-chevron" aria-hidden="true">⌄</span>
+            </button>
+            <div id="cqa-utility-menu" class="utility-menu" role="menu" hidden>
+              <button id="cqa-command-open" type="button" role="menuitem"><span aria-hidden="true">⌕</span><span><strong>Поиск</strong><small>Быстрый переход</small></span><kbd>Ctrl K</kbd></button>
+              <button id="cqa-help-open" type="button" role="menuitem"><span aria-hidden="true">?</span><span><strong>Помощь</strong><small>Как пользоваться системой</small></span></button>
+              <button id="cqa-theme" class="theme-tool" type="button" role="menuitem" aria-label="Включить тёмную тему"><span class="theme-glyph" aria-hidden="true">◐</span><span><strong class="theme-label">Тёмная тема</strong><small>Изменить оформление</small></span></button>
+            </div>
+          </div>
         </div>
       </div>
     </header>

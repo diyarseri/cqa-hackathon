@@ -27,8 +27,78 @@ const menuToggle = document.getElementById('cqa-menu-toggle');
 const nav = document.getElementById('cqa-nav');
 const helpDialog = document.getElementById('cqa-help');
 const localeSelect = document.getElementById('cqa-locale');
+const utilityWrap = document.getElementById('cqa-utility');
+const utilityToggle = document.getElementById('cqa-utility-toggle');
+const utilityMenu = document.getElementById('cqa-utility-menu');
 
 initI18n(localeSelect);
+
+const headerMenus = [];
+
+function closeHeaderMenus(except = null) {
+  for (const item of headerMenus) {
+    if (item === except) continue;
+    item.panel.hidden = true;
+    item.trigger.setAttribute('aria-expanded', 'false');
+    item.root.classList.remove('open');
+  }
+}
+
+function toggleHeaderMenu(item) {
+  const open = item.panel.hidden;
+  closeHeaderMenus(item);
+  if (open) {
+    nav.classList.remove('open');
+    menuToggle.setAttribute('aria-expanded', 'false');
+    menuToggle.setAttribute('aria-label', t('Открыть меню'));
+  }
+  item.panel.hidden = !open;
+  item.trigger.setAttribute('aria-expanded', String(open));
+  item.root.classList.toggle('open', open);
+}
+
+function registerMenu(root, trigger, panel) {
+  const item = { root, trigger, panel };
+  headerMenus.push(item);
+  trigger.addEventListener('click', () => toggleHeaderMenu(item));
+  return item;
+}
+
+function setupPicker({ rootId, select, triggerId, valueId, menuId }) {
+  const root = document.getElementById(rootId);
+  const trigger = document.getElementById(triggerId);
+  const value = document.getElementById(valueId);
+  const menu = document.getElementById(menuId);
+  const item = registerMenu(root, trigger, menu);
+
+  const refresh = () => {
+    const options = [...select.options];
+    const selected = options.find((option) => option.value === select.value) || options[0];
+    value.textContent = selected?.textContent || select.value;
+    trigger.setAttribute('aria-label', `${root.querySelector('.picker-label')?.textContent || ''}: ${value.textContent}`);
+    mount(menu, options.map((option) => h('button.picker-option', {
+      type: 'button',
+      role: 'option',
+      'aria-selected': option.value === select.value,
+      onclick: () => {
+        select.value = option.value;
+        closeHeaderMenus();
+        select.dispatchEvent(new Event('change', { bubbles: true }));
+      },
+    }, h('span', option.textContent), option.value === select.value ? h('span.option-check', { 'aria-hidden': true }, '✓') : null)));
+  };
+  select.addEventListener('change', refresh);
+  refresh();
+  return { ...item, refresh };
+}
+
+const groupPicker = setupPicker({
+  rootId: 'cqa-group-picker', select: groupSel, triggerId: 'cqa-group-trigger', valueId: 'cqa-group-value', menuId: 'cqa-group-menu',
+});
+const localePicker = setupPicker({
+  rootId: 'cqa-locale-picker', select: localeSelect, triggerId: 'cqa-locale-trigger', valueId: 'cqa-locale-value', menuId: 'cqa-locale-menu',
+});
+registerMenu(utilityWrap, utilityToggle, utilityMenu);
 
 export const ctx = {
   get group() {
@@ -67,6 +137,7 @@ async function loadGroups() {
     groups.map((g) => h('option', { value: g, selected: g === ctx.group }, g)),
     h('option', { value: '__new' }, '+ добавить набор…'),
   );
+  groupPicker.refresh();
 }
 
 groupSel.addEventListener('change', async () => {
@@ -94,6 +165,7 @@ async function route() {
       else a.removeAttribute('aria-current');
     });
     nav.classList.remove('open');
+    closeHeaderMenus();
     menuToggle.setAttribute('aria-expanded', 'false');
     menuToggle.setAttribute('aria-label', t('Открыть меню'));
     app.dataset.route = tab;
@@ -150,8 +222,8 @@ function applyTheme(theme) {
 applyTheme(document.documentElement.dataset.theme);
 themeButton.addEventListener('click', () => {
   applyTheme(document.documentElement.dataset.theme === 'dark' ? 'light' : 'dark');
+  closeHeaderMenus();
 });
-document.getElementById('cqa-theme-mobile').addEventListener('click', () => themeButton.click());
 
 const commands = [
   { title: 'Главная', detail: 'Что требует внимания', hash: '#/', terms: 'home обзор начало' },
@@ -190,13 +262,13 @@ function drawCommands() {
 }
 
 function openCommands() {
+  closeHeaderMenus();
   drawCommands();
   commandDialog.showModal();
   requestAnimationFrame(() => commandInput.focus());
 }
 
 commandOpen.addEventListener('click', openCommands);
-document.getElementById('cqa-command-mobile').addEventListener('click', openCommands);
 commandDialog.querySelector('.command-close').addEventListener('click', () => commandDialog.close());
 commandDialog.addEventListener('click', (event) => {
   if (event.target === commandDialog) commandDialog.close();
@@ -216,6 +288,7 @@ window.addEventListener('keydown', (event) => {
 });
 
 menuToggle.addEventListener('click', () => {
+  closeHeaderMenus();
   const open = nav.classList.toggle('open');
   menuToggle.setAttribute('aria-expanded', String(open));
   menuToggle.setAttribute('aria-label', t(open ? 'Закрыть меню' : 'Открыть меню'));
@@ -228,14 +301,16 @@ nav.addEventListener('click', (event) => {
 });
 
 document.addEventListener('pointerdown', (event) => {
-  if (!nav.classList.contains('open')) return;
-  if (nav.contains(event.target) || menuToggle.contains(event.target)) return;
-  nav.classList.remove('open');
-  menuToggle.setAttribute('aria-expanded', 'false');
-  menuToggle.setAttribute('aria-label', t('Открыть меню'));
+  if (!headerMenus.some((item) => item.root.contains(event.target))) closeHeaderMenus();
+  if (nav.classList.contains('open') && !nav.contains(event.target) && !menuToggle.contains(event.target)) {
+    nav.classList.remove('open');
+    menuToggle.setAttribute('aria-expanded', 'false');
+    menuToggle.setAttribute('aria-label', t('Открыть меню'));
+  }
 });
 
 function openHelp() {
+  closeHeaderMenus();
   nav.classList.remove('open');
   menuToggle.setAttribute('aria-expanded', 'false');
   menuToggle.setAttribute('aria-label', t('Открыть меню'));
@@ -243,7 +318,6 @@ function openHelp() {
 }
 
 document.getElementById('cqa-help-open').addEventListener('click', openHelp);
-document.getElementById('cqa-help-mobile').addEventListener('click', openHelp);
 document.getElementById('cqa-assistant').addEventListener('click', openHelp);
 helpDialog.querySelectorAll('.help-close').forEach((button) => button.addEventListener('click', () => helpDialog.close()));
 helpDialog.querySelector('.help-start').addEventListener('click', () => helpDialog.close());
@@ -251,9 +325,15 @@ helpDialog.addEventListener('click', (event) => {
   if (event.target === helpDialog) helpDialog.close();
 });
 
+window.addEventListener('keydown', (event) => {
+  if (event.key !== 'Escape') return;
+  closeHeaderMenus();
+});
+
 window.addEventListener('hashchange', route);
 window.addEventListener('cqa:localechange', () => {
   applyTheme(document.documentElement.dataset.theme);
+  localePicker.refresh();
   loadGroups().then(route);
 });
 loadGroups().then(route);
