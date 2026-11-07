@@ -3,13 +3,14 @@ import { api } from './api.js';
 import { h, mount, errorBox, loading, enhanceView } from './ui.js';
 
 const routes = [
-  [/^#?\/?$/, () => import('./views/dialogs.js'), 'dialogs', 'Диалоги'],
+  [/^#?\/?$/, () => import('./views/home.js'), 'home', 'Главная'],
+  [/^#\/dialogs(?:\?status=([^&]+))?$/, () => import('./views/dialogs.js'), 'dialogs', 'Все диалоги'],
   [/^#\/c\/([^/]+)(?:\/(\d+))?$/, () => import('./views/card.js'), 'dialogs', 'Карточка диалога'],
-  [/^#\/insights$/, () => import('./views/insights.js'), 'insights', 'Аналитика'],
-  [/^#\/batch$/, () => import('./views/batch.js'), 'batch', 'Пакетная оценка'],
-  [/^#\/checklists(?:\/([^/]+))?$/, () => import('./views/checklists.js'), 'checklists', 'Чек-листы'],
-  [/^#\/appeals(?:\/([^/]+))?$/, () => import('./views/appeals.js'), 'appeals', 'Апелляции'],
-  [/^#\/validation(?:\/([^/]+))?$/, () => import('./views/validation.js'), 'validation', 'Валидация'],
+  [/^#\/insights$/, () => import('./views/insights.js'), 'insights', 'Результаты'],
+  [/^#\/batch$/, () => import('./views/batch.js'), 'batch', 'Проверить набор'],
+  [/^#\/checklists(?:\/([^/]+))?$/, () => import('./views/checklists.js'), 'checklists', 'Критерии оценки'],
+  [/^#\/appeals(?:\/([^/]+))?$/, () => import('./views/appeals.js'), 'appeals', 'Спорные оценки'],
+  [/^#\/validation(?:\/([^/]+))?$/, () => import('./views/validation.js'), 'validation', 'Проверка точности'],
 ];
 
 const app = document.getElementById('cqa-app');
@@ -21,6 +22,9 @@ const commandDialog = document.getElementById('cqa-command');
 const commandOpen = document.getElementById('cqa-command-open');
 const commandInput = document.getElementById('cqa-command-input');
 const commandList = document.getElementById('cqa-command-list');
+const menuToggle = document.getElementById('cqa-menu-toggle');
+const nav = document.getElementById('cqa-nav');
+const helpDialog = document.getElementById('cqa-help');
 
 export const ctx = {
   get group() {
@@ -57,14 +61,14 @@ async function loadGroups() {
   mount(
     groupSel,
     groups.map((g) => h('option', { value: g, selected: g === ctx.group }, g)),
-    h('option', { value: '__new' }, '+ другой group_id…'),
+    h('option', { value: '__new' }, '+ добавить набор…'),
   );
 }
 
 groupSel.addEventListener('change', async () => {
   let g = groupSel.value;
   if (g === '__new') {
-    g = (prompt('group_id из API организаторов (например, контрольный набор):') || '').trim();
+    g = (prompt('Введите название или ID набора, который сообщили организаторы:') || '').trim();
     if (!g) return loadGroups();
   }
   ctx.group = g;
@@ -85,6 +89,10 @@ async function route() {
       if (current) a.setAttribute('aria-current', 'page');
       else a.removeAttribute('aria-current');
     });
+    document.querySelector('.more-menu')?.classList.toggle('has-current', ['appeals', 'checklists', 'validation'].includes(tab));
+    document.querySelector('.more-menu')?.removeAttribute('open');
+    nav.classList.remove('open');
+    menuToggle.setAttribute('aria-expanded', 'false');
     app.dataset.route = tab;
     document.title = `${title} — Conversation Quality`;
 
@@ -121,17 +129,18 @@ async function route() {
   mount(view, h('section.route-stage.route-ready',
     h('h1', 'Страница не найдена'),
     h('div.alert.err', 'Проверьте адрес или вернитесь к списку диалогов.'),
-    h('a.btn.primary', { href: '#/' }, 'К диалогам'),
+    h('a.btn.primary', { href: '#/dialogs' }, 'К диалогам'),
   ));
 }
 
 function applyTheme(theme) {
   const next = theme === 'dark' ? 'dark' : 'light';
   document.documentElement.dataset.theme = next;
-  localStorageSet('cqa.theme', next);
+  localStorageSet('cqa.theme.v2', next);
   themeButton.setAttribute('aria-label', next === 'dark' ? 'Включить светлую тему' : 'Включить тёмную тему');
   themeButton.title = themeButton.getAttribute('aria-label');
   themeButton.querySelector('.theme-glyph').textContent = next === 'dark' ? '☀' : '◐';
+  themeButton.querySelector('.theme-label').textContent = next === 'dark' ? 'Светлая тема' : 'Тёмная тема';
 }
 
 applyTheme(document.documentElement.dataset.theme);
@@ -140,12 +149,13 @@ themeButton.addEventListener('click', () => {
 });
 
 const commands = [
-  { title: 'Диалоги', detail: 'Список и поиск разговоров', hash: '#/', terms: 'dialogs conversations чаты звонки' },
-  { title: 'Аналитика', detail: 'Сводка по качеству и критериям', hash: '#/insights', terms: 'analytics insights отчёт' },
-  { title: 'Пакетная оценка', detail: 'Запустить оценку набора', hash: '#/batch', terms: 'batch model запуск' },
-  { title: 'Чек-листы', detail: 'Критерии и версии', hash: '#/checklists', terms: 'checklists criteria настройки' },
-  { title: 'Апелляции', detail: 'Очередь проверки', hash: '#/appeals', terms: 'appeals review споры' },
-  { title: 'Валидация', detail: 'Сравнение с ручной разметкой', hash: '#/validation', terms: 'validation labels разметка' },
+  { title: 'Главная', detail: 'Что требует внимания', hash: '#/', terms: 'home обзор начало' },
+  { title: 'Все диалоги', detail: 'Список и поиск разговоров', hash: '#/dialogs', terms: 'dialogs conversations чаты звонки' },
+  { title: 'Результаты', detail: 'Сводка по качеству и критериям', hash: '#/insights', terms: 'analytics insights отчёт' },
+  { title: 'Проверить набор', detail: 'Проверить новые диалоги', hash: '#/batch', terms: 'batch model запуск оценить' },
+  { title: 'Критерии оценки', detail: 'Правила и версии', hash: '#/checklists', terms: 'checklists criteria настройки' },
+  { title: 'Спорные оценки', detail: 'Очередь пересмотра', hash: '#/appeals', terms: 'appeals review споры' },
+  { title: 'Проверка точности', detail: 'Сравнение с ручной разметкой', hash: '#/validation', terms: 'validation labels разметка' },
 ];
 
 function goCommand(hash) {
@@ -197,6 +207,35 @@ window.addEventListener('keydown', (event) => {
     if (commandDialog.open) commandDialog.close();
     else openCommands();
   }
+});
+
+menuToggle.addEventListener('click', () => {
+  const open = nav.classList.toggle('open');
+  menuToggle.setAttribute('aria-expanded', String(open));
+  menuToggle.setAttribute('aria-label', open ? 'Закрыть меню' : 'Открыть меню');
+});
+nav.addEventListener('click', (event) => {
+  if (!event.target.closest('a')) return;
+  nav.classList.remove('open');
+  menuToggle.setAttribute('aria-expanded', 'false');
+  menuToggle.setAttribute('aria-label', 'Открыть меню');
+  document.querySelector('.more-menu')?.removeAttribute('open');
+});
+
+function openHelp() {
+  document.querySelector('.more-menu')?.removeAttribute('open');
+  nav.classList.remove('open');
+  menuToggle.setAttribute('aria-expanded', 'false');
+  menuToggle.setAttribute('aria-label', 'Открыть меню');
+  helpDialog.showModal();
+}
+
+document.getElementById('cqa-help-open').addEventListener('click', openHelp);
+document.getElementById('cqa-help-menu').addEventListener('click', openHelp);
+helpDialog.querySelectorAll('.help-close').forEach((button) => button.addEventListener('click', () => helpDialog.close()));
+helpDialog.querySelector('.help-start').addEventListener('click', () => helpDialog.close());
+helpDialog.addEventListener('click', (event) => {
+  if (event.target === helpDialog) helpDialog.close();
 });
 
 window.addEventListener('hashchange', route);

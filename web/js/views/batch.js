@@ -6,6 +6,20 @@ import { currentChecklist, checklistPicker } from '../checklist-pick.js';
 let timer = null;
 let watchSequence = 0;
 
+const STATUS = {
+  pending: 'В очереди',
+  running: 'Проверяется',
+  done: 'Готово',
+  skipped: 'Уже проверен',
+  error: 'Ошибка',
+  finished: 'Завершена',
+  failed: 'Не завершена',
+  cancelling: 'Останавливается',
+  cancelled: 'Остановлена',
+};
+
+const simpleStatus = (status) => STATUS[status] || status;
+
 export async function render(root, ctx, jobId) {
   clearTimeout(timer);
   watchSequence += 1;
@@ -19,8 +33,9 @@ export async function render(root, ctx, jobId) {
   const conc = h('input', { type: 'number', min: 1, max: 8, value: 4, style: { width: '4.5rem' } });
   const runs = h('select', { style: { width: 'auto' } }, [1, 3, 5].map((n) => h('option', { value: n, selected: n === 3 }, n === 1 ? '1 (быстро)' : `${n} (голосование)`)));
   const jobBox = h('div');
+  const startBtn = h('button.btn.primary', { onclick: start }, 'Проверить новые диалоги');
 
-  const start = async (e) => {
+  async function start(e) {
     e.target.disabled = true;
     try {
       const job = await api.post('/api/batch', {
@@ -33,32 +48,42 @@ export async function render(root, ctx, jobId) {
       toast(err.message, 'err');
     }
     e.target.disabled = false;
-  };
+  }
+
+  onlyMissing.addEventListener('change', () => {
+    startBtn.textContent = onlyMissing.checked ? 'Проверить новые диалоги' : 'Проверить весь набор';
+  });
 
   mount(root,
     h('div.page-heading',
-      h('div', h('h1', 'Пакетная оценка'), h('p.muted', `Оцените весь набор ${ctx.group} и следите за ходом работы модели.`))),
-    h('div.panel',
+      h('div', h('h1', 'Проверить весь набор'), h('p.muted', `Система проверит новые диалоги из набора «${ctx.group}» и покажет результат по каждому из них.`))),
+    h('div.panel.batch-start',
+      h('div',
+        h('h2', { style: { marginTop: 0 } }, 'Начать проверку'),
+        h('p', 'По умолчанию уже проверенные диалоги пропускаются. Вы сможете продолжать пользоваться страницей, пока идёт проверка.')),
+      h('div.row', startBtn, h('a.btn.ghost', { href: '#/dialogs' }, 'Сначала посмотреть диалоги'))),
+    h('details.box.batch-settings',
+      h('summary', 'Дополнительные настройки'),
+      h('p.muted', 'Эти параметры можно не менять для обычной проверки.'),
       h('div.toolbar',
         await checklistPicker(),
-        h('label.check', onlyMissing, ' только неоценённые / оценённые старой версией чек-листа'),
-        h('label.check', refresh, ' заново загрузить набор из API'),
-        h('label.check', 'Параллельно: ', conc),
-        h('label.check', 'Прогонов на диалог: ', runs),
-        h('button.btn.primary', { onclick: start }, `▶ Оценить весь набор ${ctx.group}`),
-        h('a.btn.ghost', { href: api.url(`/api/groups/${enc(ctx.group)}/results.csv?checklist=${enc(await currentChecklist())}`) }, '⬇ CSV результатов')),
+        h('label.check', onlyMissing, ' Проверять только новые диалоги'),
+        h('label.check', refresh, ' Обновить набор данных перед проверкой'),
+        h('label.check', 'Одновременно проверять: ', conc),
+        h('label.check', 'Надёжность результата: ', runs)),
+      h('h3', 'Отчёт и резервная копия'),
       h('div.toolbar',
-        h('b', 'Обмен с напарником / резервная копия:'),
-        h('a.btn', { href: api.url(`/api/groups/${enc(ctx.group)}/export`) }, `⬇ Экспорт набора ${ctx.group} (оценки, апелляции, разметка, чек-листы)`),
-        h('label.btn', { style: { flexDirection: 'row', margin: 0, color: 'var(--ink)', cursor: 'pointer' } }, '⬆ Импорт файла',
+        h('a.btn', { href: api.url(`/api/groups/${enc(ctx.group)}/results.csv?checklist=${enc(await currentChecklist())}`) }, 'Скачать отчёт'),
+        h('a.btn.ghost', { href: api.url(`/api/groups/${enc(ctx.group)}/export`) }, 'Сохранить полную копию'),
+        h('label.btn', { style: { flexDirection: 'row', margin: 0, color: 'var(--ink)', cursor: 'pointer' } }, 'Загрузить резервную копию',
           h('input', { type: 'file', accept: '.json,application/json', hidden: true, onchange: (e) => importFile(e.target, root, ctx) }))),
-      h('p.muted', 'Контрольный набор: выберите «+ другой group_id…» в правом верхнем углу, затем запустите здесь. Ошибки модели повторяются автоматически (до 4 попыток с паузой 2→4→8 с).')),
+      h('p.muted', 'При временной ошибке система автоматически повторит попытку.')),
     jobBox,
-    groupJobs.length ? h('details.box', h('summary', `Предыдущие запуски (${groupJobs.length})`),
+    groupJobs.length ? h('details.box', h('summary', `История проверок (${groupJobs.length})`),
       h('div.table-scroll', h('table.tbl', groupJobs.map((j) => h('tr',
-        h('td', h('button.btn.ghost.small', { type: 'button', onclick: () => watch(jobBox, ctx, j.id), 'aria-label': `Открыть запуск ${j.id}` }, j.id)),
-        h('td', j.group_id), h('td', `${j.checklist.name} v${j.checklist.version}`), h('td', j.status),
-        h('td', `${j.counts.done} ✓ · ${j.counts.skipped} пропущено · ${j.counts.error} ошибок`), h('td', fmtDate(j.started_at))))))) : null,
+        h('td', h('button.btn.ghost.small', { type: 'button', onclick: () => watch(jobBox, ctx, j.id), 'aria-label': `Открыть проверку от ${fmtDate(j.started_at)}` }, 'Открыть')),
+        h('td', fmtDate(j.started_at)), h('td', j.group_id), h('td', simpleStatus(j.status)),
+        h('td', `${j.counts.done} готово · ${j.counts.skipped} пропущено · ${j.counts.error} ошибок`), h('td', j.checklist.name)))))) : null,
   );
   if (active) watch(jobBox, ctx, active);
 }
@@ -101,26 +126,25 @@ function watch(box, ctx, id) {
 function draw(box, ctx, job) {
   const c = job.counts;
   const pct = Math.round(job.progress * 100);
-  const STATUS = { pending: '⏳ в очереди', running: '⚙ оценивается', done: '✔ готово', skipped: '↷ уже оценён', error: '✖ ошибка' };
   mount(box, h('div.panel',
-    h('div.row', h('b', `Запуск ${job.id}`), h('span.muted', `${job.group_id} · ${job.checklist.name} v${job.checklist.version} · ${job.status}`),
+    h('div.row', h('b', 'Текущая проверка'), h('span.pill', simpleStatus(job.status)),
       job.status === 'running' && h('button.btn.small', { onclick: async (event) => {
         const button = event.currentTarget;
         button.disabled = true;
         try {
           await api.post(`/api/batch/${enc(job.id)}/cancel`);
-          toast('Останавливаю после текущих диалогов');
+          toast('Проверка остановится после текущего диалога');
         } catch (error) {
           toast(error.message, 'err');
           button.disabled = false;
         }
-      } }, 'Стоп'),
+      } }, 'Остановить проверку'),
       job.status !== 'running' && (c.error || c.pending) ? h('button.btn.small.primary', {
         onclick: async () => {
           try { const j = await api.post(`/api/batch/${enc(job.id)}/retry`); toast(`Повтор: ${j.items.length}`); watch(box, ctx, j.id); }
           catch (e) { toast(e.message, 'err'); }
         },
-      }, `↻ Повторить неудачные (${c.error + c.pending})`) : null),
+      }, `Повторить ошибки (${c.error + c.pending})`) : null),
     h('div.progress', {
       role: 'progressbar',
       'aria-label': `Прогресс пакетной оценки: ${pct}%`,
@@ -129,15 +153,19 @@ function draw(box, ctx, job) {
       'aria-valuenow': String(pct),
     }, h('div', { style: { width: `${pct}%` } })),
     h('div.row', { 'aria-live': 'polite' },
-      h('span.pill', `${c.done} готово`), h('span.pill.na', `${c.skipped} пропущено`), h('span.pill.warn', `${c.running} в работе · ${c.pending} в очереди`),
+      h('span.pill', `${c.done} проверено`), h('span.pill.na', `${c.skipped} уже были готовы`), h('span.pill.warn', `${c.running} проверяется · ${c.pending} ожидает`),
       c.error ? h('span.pill.err', `${c.error} ошибок`) : null,
-      h('span.muted', `${pct}% · ${job.usage.calls} вызовов модели · ${job.usage.input + job.usage.output} токенов${job.cost_usd_estimate ? ` · ≈$${job.cost_usd_estimate}` : ''}`)),
+      h('b', `${pct}%`)),
+    h('details.box.batch-technical',
+      h('summary', 'Технические сведения'),
+      h('p.muted', `${job.group_id} · ${job.checklist.name}, версия ${job.checklist.version}`),
+      h('p.muted', `${job.usage.calls} обращений к модели · ${job.usage.input + job.usage.output} токенов${job.cost_usd_estimate ? ` · приблизительная стоимость $${job.cost_usd_estimate}` : ''}`)),
     h('div.table-scroll', { role: 'region', 'aria-label': 'Результаты пакетной оценки', tabIndex: 0 }, h('table.tbl',
-      h('thead', h('tr', h('th', 'Диалог'), h('th', 'Язык'), h('th', 'Статус'), h('th.num', 'Попыток'), h('th.num', 'Итог'), h('th', 'Флаг'), h('th', 'Ошибка'))),
+      h('thead', h('tr', h('th', 'Диалог'), h('th', 'Язык'), h('th', 'Статус'), h('th.num', 'Попытки'), h('th.num', 'Результат'), h('th', 'Серьёзное нарушение'), h('th', 'Сообщение'))),
       h('tbody', job.items.map((it) => h('tr',
         h('td', h('a', { href: `#/c/${enc(it.conversation_id)}` }, it.conversation_id)),
-        h('td', it.language), h('td', STATUS[it.status]), h('td.num', it.attempts),
+        h('td', it.language), h('td', simpleStatus(it.status)), h('td.num', it.attempts),
         h('td.num', fmtScore(it.total)),
-        h('td', it.gross_error ? h('span.flag-gross', { 'aria-label': 'Грубая ошибка', title: 'Грубая ошибка' }, '⚠') : ''),
+        h('td', it.gross_error ? h('span.flag-gross', 'Найдено') : '—'),
         h('td.muted', it.error ? it.error.slice(0, 120) : ''))))))));
 }

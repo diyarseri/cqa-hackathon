@@ -11,7 +11,7 @@ export function appealBlock(view, k, r) {
 
   const history = mine.map((a) =>
     h('div', { class: `appeal-note${a.status === 'open' ? '' : ' done'}` },
-      h('b', a.status === 'open' ? '⏳ Апелляция на рассмотрении' : a.status === 'changed' ? '✔ Оценка изменена' : '✔ Оценка подтверждена'),
+      h('b', a.status === 'open' ? 'Запрос на пересмотр отправлен' : a.status === 'changed' ? 'Оценка изменена' : 'Оценка подтверждена'),
       ` · ${fmtDate(a.created_at)}`,
       h('div', 'Комментарий: ', a.comment),
       a.decision && h('div',
@@ -33,7 +33,7 @@ export function appealBlock(view, k, r) {
                   checklist_id: ev.checklist.id, criterion_id: k.id, comment: ta.value,
                 });
                 view.evaluation = res.evaluation;
-                toast('Апелляция подана');
+                toast('Запрос на пересмотр отправлен');
                 view.drawResults();
                 document.getElementById(`r-${k.id}`)?.scrollIntoView({ block: 'center' });
               } catch (err) {

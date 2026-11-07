@@ -17,7 +17,7 @@ export async function render(root, ctx, convId) {
 
   mount(root,
     h('div.page-heading',
-      h('div', h('h1', 'Валидация'), h('p.muted', `Сравнение ручной разметки с моделью · набор ${ctx.group}`))),
+      h('div', h('h1', 'Проверка точности'), h('p.muted', `Сравнение ручной проверки с результатом системы · набор ${ctx.group}`))),
     h('div.alert.info',
       'Разметьте вручную 10 диалогов, не глядя на оценку модели (она скрыта до сохранения). Делите работу: каждый размечает 5, затем 2–3 диалога размечают оба и сверяют разногласия между собой.'),
     h('div.summary',
@@ -106,7 +106,7 @@ async function labelView(root, ctx, convId, checklistId) {
   }
 
   mount(root,
-    h('div.toolbar', h('a.btn.ghost', { href: '#/validation' }, '← Валидация'), h('h1', { style: { margin: 0 } }, `Разметка: ${convId}`), labeler,
+    h('div.toolbar', h('a.btn.ghost', { href: '#/validation' }, '← Проверка точности'), h('h1', { style: { margin: 0 } }, `Ручная проверка: ${convId}`), labeler,
       h('button.btn.primary', { onclick: save }, 'Сохранить и сравнить')),
     h('div.card-layout',
       h('div.transcript', { role: 'region', 'aria-label': 'Расшифровка диалога', tabIndex: 0 }, conv.messages.map((m) => h('div', { class: `msg ${m.speaker}` },

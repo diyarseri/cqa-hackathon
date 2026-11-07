@@ -31,7 +31,7 @@ export async function currentChecklist() {
 export async function checklistPicker(onChange) {
   const all = await lists();
   const cur = await currentChecklist();
-  return h('label.check', 'Чек-лист: ',
+  return h('label.check', 'Правила оценки: ',
     h('select', {
       style: { width: 'auto', marginLeft: '.3rem' },
       onchange: async (e) => {

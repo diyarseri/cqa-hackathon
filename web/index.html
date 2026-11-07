@@ -8,9 +8,7 @@
   <title>Conversation Quality — Freedom Broker</title>
   <script>
     try {
-      const savedTheme = localStorage.getItem('cqa.theme');
-      const systemDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
-      document.documentElement.dataset.theme = savedTheme || (systemDark ? 'dark' : 'light');
+      document.documentElement.dataset.theme = localStorage.getItem('cqa.theme.v2') || 'light';
     } catch {}
   </script>
   <link rel="stylesheet" href="css/app.css">
@@ -30,34 +28,40 @@
           </span>
         </a>
 
+        <button id="cqa-menu-toggle" class="menu-toggle" type="button" aria-label="Открыть меню" aria-expanded="false" aria-controls="cqa-nav">
+          <span aria-hidden="true">☰</span><span>Меню</span>
+        </button>
+
         <nav class="tabs" id="cqa-nav" aria-label="Основная навигация">
-          <a href="#/insights" data-tab="insights">Аналитика</a>
-          <a href="#/" data-tab="dialogs">Диалоги</a>
-          <a href="#/batch" data-tab="batch">Пакетная оценка</a>
-          <a href="#/checklists" data-tab="checklists">Чек-листы</a>
-          <a href="#/appeals" data-tab="appeals">Апелляции</a>
-          <a href="#/validation" data-tab="validation">Валидация</a>
+          <a href="#/" data-tab="home">Главная</a>
+          <a href="#/dialogs" data-tab="dialogs">Все диалоги</a>
+          <a href="#/insights" data-tab="insights">Результаты</a>
+          <a href="#/batch" data-tab="batch">Проверить набор</a>
+          <details class="more-menu">
+            <summary>Ещё <span aria-hidden="true">⌄</span></summary>
+            <div class="more-menu-card">
+              <a href="#/appeals" data-tab="appeals"><strong>Спорные оценки</strong><small>Решения проверяющего</small></a>
+              <a href="#/checklists" data-tab="checklists"><strong>Критерии оценки</strong><small>Правила и версии</small></a>
+              <a href="#/validation" data-tab="validation"><strong>Проверка точности</strong><small>Сравнение с человеком</small></a>
+              <div class="menu-divider"></div>
+              <button id="cqa-help-menu" type="button"><span>Как пользоваться</span><span aria-hidden="true">?</span></button>
+              <button id="cqa-command-open" type="button"><span>Быстрый переход</span><kbd>Ctrl K</kbd></button>
+              <button id="cqa-theme" type="button"><span class="theme-label">Тёмная тема</span><span class="theme-glyph" aria-hidden="true">◐</span></button>
+            </div>
+          </details>
         </nav>
 
         <div class="top-actions">
-          <div id="cqa-connection" class="connection pending" role="status" aria-live="polite">
+          <div id="cqa-connection" class="connection pending" role="status" aria-live="polite" title="Подключение к серверу">
             <span class="connection-dot" aria-hidden="true"></span>
-            <span class="connection-label">Подключение</span>
+            <span class="connection-label sr-only">Подключение</span>
           </div>
-
-          <button id="cqa-command-open" class="icon-action command-open" type="button"
-                  aria-label="Быстрый переход" aria-keyshortcuts="Control+K Meta+K" title="Быстрый переход (Ctrl/⌘ + K)">
-            <span aria-hidden="true">⌘K</span>
-          </button>
-
-          <button id="cqa-theme" class="icon-action" type="button" aria-label="Переключить тему" title="Переключить тему">
-            <span class="theme-glyph" aria-hidden="true">◐</span>
-          </button>
-
           <label class="group-pick" for="cqa-group">
-            <span>Набор</span>
+            <span>Набор данных</span>
             <select id="cqa-group" aria-label="Выбранный набор данных"></select>
           </label>
+          <button id="cqa-help-open" class="header-help" type="button">Помощь</button>
+          <a class="header-primary" href="#/batch">Проверить новые</a>
         </div>
       </div>
     </header>
@@ -83,6 +87,28 @@
         </label>
         <div id="cqa-command-list" class="command-list"></div>
         <p class="command-hint">Введите ID и нажмите Enter, чтобы открыть диалог в выбранном наборе.</p>
+      </div>
+    </dialog>
+
+    <dialog id="cqa-help" class="help-dialog" aria-labelledby="cqa-help-title">
+      <div class="help-shell">
+        <div class="help-heading">
+          <div>
+            <span class="eyebrow">БЫСТРЫЙ СТАРТ</span>
+            <h2 id="cqa-help-title">Как пользоваться системой</h2>
+          </div>
+          <button class="help-close" type="button" aria-label="Закрыть">×</button>
+        </div>
+        <div class="help-steps">
+          <div><span>1</span><section><strong>Выберите набор данных</strong><p>Обычно для начала подходит набор DEV.</p></section></div>
+          <div><span>2</span><section><strong>Проверьте новые диалоги</strong><p>Система оценит только те разговоры, которые ещё не проверены.</p></section></div>
+          <div><span>3</span><section><strong>Откройте результат</strong><p>Посмотрите итог, объяснение и подтверждающие реплики.</p></section></div>
+          <div><span>4</span><section><strong>Исправьте спорную оценку</strong><p>Отправьте её на пересмотр, если не согласны с результатом.</p></section></div>
+        </div>
+        <div class="help-footer">
+          <a class="btn primary help-start" href="#/batch">Начать проверку</a>
+          <button class="btn help-close" type="button">Понятно</button>
+        </div>
       </div>
     </dialog>
   </div>
