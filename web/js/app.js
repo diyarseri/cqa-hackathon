@@ -1,6 +1,7 @@
 // Hash router. Each view is a module exporting render(root, ctx, ...params).
 import { api } from './api.js';
 import { h, mount, errorBox, loading, enhanceView } from './ui.js';
+import { initI18n, t } from './i18n.js';
 
 const routes = [
   [/^#?\/?$/, () => import('./views/home.js'), 'home', 'Главная'],
@@ -25,6 +26,9 @@ const commandList = document.getElementById('cqa-command-list');
 const menuToggle = document.getElementById('cqa-menu-toggle');
 const nav = document.getElementById('cqa-nav');
 const helpDialog = document.getElementById('cqa-help');
+const localeSelect = document.getElementById('cqa-locale');
+
+initI18n(localeSelect);
 
 export const ctx = {
   get group() {
@@ -44,8 +48,8 @@ function localStorageSet(k, v) {
 
 function setConnection(state, label, detail = '') {
   connection.className = `connection ${state}`;
-  connection.querySelector('.connection-label').textContent = label;
-  connection.title = detail || label;
+  connection.querySelector('.connection-label').textContent = t(label);
+  connection.title = t(detail || label);
 }
 
 async function loadGroups() {
@@ -68,7 +72,7 @@ async function loadGroups() {
 groupSel.addEventListener('change', async () => {
   let g = groupSel.value;
   if (g === '__new') {
-    g = (prompt('Введите название или ID набора, который сообщили организаторы:') || '').trim();
+    g = (prompt(t('Введите название или ID набора, который сообщили организаторы:')) || '').trim();
     if (!g) return loadGroups();
   }
   ctx.group = g;
@@ -89,12 +93,11 @@ async function route() {
       if (current) a.setAttribute('aria-current', 'page');
       else a.removeAttribute('aria-current');
     });
-    document.querySelector('.more-menu')?.classList.toggle('has-current', ['appeals', 'checklists', 'validation'].includes(tab));
-    document.querySelector('.more-menu')?.removeAttribute('open');
     nav.classList.remove('open');
     menuToggle.setAttribute('aria-expanded', 'false');
+    menuToggle.setAttribute('aria-label', t('Открыть меню'));
     app.dataset.route = tab;
-    document.title = `${title} — Conversation Quality`;
+    document.title = `${t(title)} — Conversation Quality`;
 
     // Each navigation renders into its own node. A slow previous request can
     // finish safely without replacing the newer route.
@@ -138,15 +141,17 @@ function applyTheme(theme) {
   document.documentElement.dataset.theme = next;
   localStorageSet('cqa.theme.v2', next);
   themeButton.setAttribute('aria-label', next === 'dark' ? 'Включить светлую тему' : 'Включить тёмную тему');
+  themeButton.setAttribute('aria-label', t(themeButton.getAttribute('aria-label')));
   themeButton.title = themeButton.getAttribute('aria-label');
   themeButton.querySelector('.theme-glyph').textContent = next === 'dark' ? '☀' : '◐';
-  themeButton.querySelector('.theme-label').textContent = next === 'dark' ? 'Светлая тема' : 'Тёмная тема';
+  themeButton.querySelector('.theme-label').textContent = t(next === 'dark' ? 'Светлая тема' : 'Тёмная тема');
 }
 
 applyTheme(document.documentElement.dataset.theme);
 themeButton.addEventListener('click', () => {
   applyTheme(document.documentElement.dataset.theme === 'dark' ? 'light' : 'dark');
 });
+document.getElementById('cqa-theme-mobile').addEventListener('click', () => themeButton.click());
 
 const commands = [
   { title: 'Главная', detail: 'Что требует внимания', hash: '#/', terms: 'home обзор начало' },
@@ -167,7 +172,7 @@ function goCommand(hash) {
 function drawCommands() {
   const query = commandInput.value.trim();
   const needle = query.toLocaleLowerCase('ru');
-  const matches = commands.filter((item) => `${item.title} ${item.detail} ${item.terms}`.toLocaleLowerCase('ru').includes(needle));
+  const matches = commands.filter((item) => `${item.title} ${t(item.title)} ${item.detail} ${t(item.detail)} ${item.terms}`.toLocaleLowerCase().includes(needle));
   const direct = query
     ? h('button.command-item.direct', { type: 'button', onclick: () => goCommand(`#/c/${encodeURIComponent(query)}`) },
       h('span.command-symbol', { 'aria-hidden': true }, '↗'),
@@ -191,6 +196,7 @@ function openCommands() {
 }
 
 commandOpen.addEventListener('click', openCommands);
+document.getElementById('cqa-command-mobile').addEventListener('click', openCommands);
 commandDialog.querySelector('.command-close').addEventListener('click', () => commandDialog.close());
 commandDialog.addEventListener('click', (event) => {
   if (event.target === commandDialog) commandDialog.close();
@@ -212,26 +218,32 @@ window.addEventListener('keydown', (event) => {
 menuToggle.addEventListener('click', () => {
   const open = nav.classList.toggle('open');
   menuToggle.setAttribute('aria-expanded', String(open));
-  menuToggle.setAttribute('aria-label', open ? 'Закрыть меню' : 'Открыть меню');
+  menuToggle.setAttribute('aria-label', t(open ? 'Закрыть меню' : 'Открыть меню'));
 });
 nav.addEventListener('click', (event) => {
-  if (!event.target.closest('a')) return;
+  if (!event.target.closest('a, button')) return;
   nav.classList.remove('open');
   menuToggle.setAttribute('aria-expanded', 'false');
-  menuToggle.setAttribute('aria-label', 'Открыть меню');
-  document.querySelector('.more-menu')?.removeAttribute('open');
+  menuToggle.setAttribute('aria-label', t('Открыть меню'));
+});
+
+document.addEventListener('pointerdown', (event) => {
+  if (!nav.classList.contains('open')) return;
+  if (nav.contains(event.target) || menuToggle.contains(event.target)) return;
+  nav.classList.remove('open');
+  menuToggle.setAttribute('aria-expanded', 'false');
+  menuToggle.setAttribute('aria-label', t('Открыть меню'));
 });
 
 function openHelp() {
-  document.querySelector('.more-menu')?.removeAttribute('open');
   nav.classList.remove('open');
   menuToggle.setAttribute('aria-expanded', 'false');
-  menuToggle.setAttribute('aria-label', 'Открыть меню');
+  menuToggle.setAttribute('aria-label', t('Открыть меню'));
   helpDialog.showModal();
 }
 
 document.getElementById('cqa-help-open').addEventListener('click', openHelp);
-document.getElementById('cqa-help-menu').addEventListener('click', openHelp);
+document.getElementById('cqa-help-mobile').addEventListener('click', openHelp);
 document.getElementById('cqa-assistant').addEventListener('click', openHelp);
 helpDialog.querySelectorAll('.help-close').forEach((button) => button.addEventListener('click', () => helpDialog.close()));
 helpDialog.querySelector('.help-start').addEventListener('click', () => helpDialog.close());
@@ -240,4 +252,8 @@ helpDialog.addEventListener('click', (event) => {
 });
 
 window.addEventListener('hashchange', route);
+window.addEventListener('cqa:localechange', () => {
+  applyTheme(document.documentElement.dataset.theme);
+  loadGroups().then(route);
+});
 loadGroups().then(route);
