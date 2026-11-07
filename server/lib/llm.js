@@ -27,7 +27,7 @@ async function gemini({ model }, { system, user, schema }) {
   const key = process.env.GEMINI_API_KEY;
   if (!key) throw new LlmError('GEMINI_API_KEY is not set (get a free key at aistudio.google.com)', { status: 401, retryable: false });
   // On overload (429/5xx) fall through to the next model in GEMINI_FALLBACK_MODELS.
-  const fallbacks = (process.env.GEMINI_FALLBACK_MODELS ?? 'gemini-3.8-flash,gemini-2.5-flash')
+  const fallbacks = (process.env.GEMINI_FALLBACK_MODELS ?? 'gemini-3.8-flash,gemini-3.5-flash-lite')
     .split(',').map((m) => m.trim()).filter((m) => m && m !== model);
   let lastErr;
   for (const m of [model, ...fallbacks]) {
@@ -43,10 +43,13 @@ async function gemini({ model }, { system, user, schema }) {
         label: 'Gemini',
       });
     } catch (e) {
-      lastErr = e;
+      // Keep the first overload error: a later 404 (retired fallback model)
+      // must not hide it, or the batch would stop retrying.
+      if (!lastErr || (e.retryable && !lastErr.retryable)) lastErr = e;
       if (!(e.retryable || e.status === 404)) throw e;
     }
   }
+  if (lastErr && !lastErr.retryable && lastErr.status === 404) lastErr.retryable = true;
   throw lastErr;
 }
 

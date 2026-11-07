@@ -6,6 +6,7 @@ import * as ds from './lib/datasource.js';
 import * as cl from './lib/checklists.js';
 import * as ev from './lib/evaluator.js';
 import * as ap from './lib/appeals.js';
+import * as batch from './lib/batch.js';
 import { computeFacts } from './lib/facts.js';
 import { buildSystemPrompt, buildUserPrompt } from './lib/prompt.js';
 import { providerInfo, pricing } from './lib/llm.js';
@@ -120,6 +121,36 @@ app.post('/api/groups/:group/conversations/:id/appeals/:appeal/decision', ({ par
     reviewer: body.reviewer,
   }),
 );
+
+// ---- Step 7: batch ------------------------------------------------------------
+app.post('/api/batch', ({ body }) =>
+  batch.startBatch({
+    group: body.group_id,
+    checklistId: body.checklist_id || 'chat-quality',
+    onlyMissing: body.only_missing !== false,
+    refresh: !!body.refresh,
+    concurrency: body.concurrency,
+  }),
+);
+app.get('/api/batch', () => batch.listJobs());
+app.get('/api/batch/:id', ({ params }) => batch.getJob(params.id));
+app.post('/api/batch/:id/cancel', ({ params }) => batch.cancelJob(params.id));
+app.post('/api/batch/:id/retry', ({ params }) => batch.retryFailed(params.id));
+
+// CSV of all results for a group (final scores + per-criterion answers).
+app.get('/api/groups/:group/results.csv', ({ params, query, res }) => {
+  const checklistId = query.get('checklist') || 'chat-quality';
+  const evals = ev.listEvaluations(params.group, checklistId).sort((a, b) => a.conversation_id.localeCompare(b.conversation_id));
+  const ids = [...new Set(evals.flatMap((e) => e.criteria.map((c) => c.id)))];
+  const esc = (v) => (v == null ? '' : /[",\n;]/.test(String(v)) ? `"${String(v).replace(/"/g, '""')}"` : String(v));
+  const lines = [['conversation_id', 'language', 'channel', 'checklist_version', 'original_total', 'final_total', 'gross_error', ...ids].join(',')];
+  for (const e of evals) {
+    const fin = Object.fromEntries(e.final_score.criteria.map((c) => [c.id, c.answer]));
+    lines.push([e.conversation_id, e.language, e.channel, e.checklist.version, e.original_score.total, e.final_score.total, e.final_score.gross_error, ...ids.map((i) => fin[i])].map(esc).join(','));
+  }
+  res.writeHead(200, { 'content-type': 'text/csv; charset=utf-8', 'content-disposition': `attachment; filename="cqa-${params.group}.csv"` });
+  res.end('﻿' + lines.join('\n'));
+});
 
 // ---- static UI ----------------------------------------------------------------
 app.static('/shared/', path.join(PROJECT_ROOT, 'shared')); // pure modules shared with the browser
