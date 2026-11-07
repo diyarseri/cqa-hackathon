@@ -2,8 +2,10 @@
 import { api, enc } from '../api.js';
 import { h, mount, toast, fmtDate, errorBox, loading } from '../ui.js';
 import { validateChecklist, blankCriterion, TYPE_LABELS } from '/shared/checklist.js';
+import { invalidateChecklists } from '../checklist-pick.js';
 
 export async function render(root, ctx, id) {
+  invalidateChecklists();
   mount(root, loading());
   const list = await api.get('/api/checklists');
   if (!id) id = list[0]?.id;
