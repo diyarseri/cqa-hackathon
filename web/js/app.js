@@ -232,6 +232,7 @@ function openHelp() {
 
 document.getElementById('cqa-help-open').addEventListener('click', openHelp);
 document.getElementById('cqa-help-menu').addEventListener('click', openHelp);
+document.getElementById('cqa-assistant').addEventListener('click', openHelp);
 helpDialog.querySelectorAll('.help-close').forEach((button) => button.addEventListener('click', () => helpDialog.close()));
 helpDialog.querySelector('.help-start').addEventListener('click', () => helpDialog.close());
 helpDialog.addEventListener('click', (event) => {
