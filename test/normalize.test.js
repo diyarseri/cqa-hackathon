@@ -72,3 +72,11 @@ test('fmtClock', () => {
   assert.equal(fmtClock(75.9), '01:15');
   assert.equal(fmtClock(3723), '1:02:03');
 });
+
+test('unknown speaker spellings map to the four roles; original kept', () => {
+  const r = normalizeRecord({ conversation_id: 's', transcript: [
+    { timestamp: '00:00', speaker: 'Customer', text: 'a' }, { timestamp: '00:01', speaker: 'agent', text: 'b' }, { timestamp: '00:02', speaker: 'operator', text: 'c' },
+  ] });
+  assert.deepEqual(r.messages.map((m) => m.speaker), ['client', 'operator', 'operator']);
+  assert.equal(r.messages[0].speaker_original, 'Customer');
+});

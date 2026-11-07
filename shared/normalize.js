@@ -68,7 +68,7 @@ export function normalizeRecord(rec) {
   if (fmt === 'iso') {
     let pauseAt = null;
     transcript.forEach((m, i) => {
-      if (m.speaker !== 'system' || abs[i] == null) return;
+      if (normSpeaker(m.speaker) !== 'system' || abs[i] == null) return;
       if (recStart == null && any(REC_START, m.text)) recStart = abs[i];
       else if (any(REC_PAUSE, m.text)) pauseAt = abs[i];
       else if (any(REC_RESUME, m.text) && pauseAt != null) {
@@ -96,7 +96,8 @@ export function normalizeRecord(rec) {
     return {
       idx: i,
       timestamp: m.timestamp, // original, untouched
-      speaker: m.speaker,
+      speaker: normSpeaker(m.speaker),
+      speaker_original: m.speaker,
       text: m.text ?? '',
       offset_sec: abs[i] == null ? null : round3(abs[i] - t0),
       audio_sec: audio,
@@ -115,6 +116,18 @@ export function normalizeRecord(rec) {
 }
 
 const round3 = (x) => Math.round(x * 1000) / 1000;
+
+// Defensive: map speaker spellings a new dataset might use to the 4 roles.
+const SPEAKER_ALIASES = {
+  agent: 'operator', employee: 'operator', support: 'operator', оператор: 'operator', manager: 'operator',
+  customer: 'client', user: 'client', клиент: 'client',
+  assistant: 'bot', ivr: 'bot', бот: 'bot', aim: 'bot',
+  sys: 'system', система: 'system', event: 'system',
+};
+export function normSpeaker(sp) {
+  const k = String(sp ?? '').trim().toLowerCase();
+  return SPEAKER_ALIASES[k] || k || 'system';
+}
 
 /** "125.4" → "02:05" for display. */
 export function fmtClock(sec) {
