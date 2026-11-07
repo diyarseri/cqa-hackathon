@@ -4,6 +4,10 @@ import { Router } from './http.js';
 import { loadDotEnv, PROJECT_ROOT, httpError } from './lib/store.js';
 import * as ds from './lib/datasource.js';
 import * as cl from './lib/checklists.js';
+import * as ev from './lib/evaluator.js';
+import { computeFacts } from './lib/facts.js';
+import { buildSystemPrompt, buildUserPrompt } from './lib/prompt.js';
+import { providerInfo, pricing } from './lib/llm.js';
 
 loadDotEnv();
 const app = new Router();
@@ -49,6 +53,43 @@ app.get('/api/checklists/:id', ({ params, query }) => cl.get(params.id, query.ge
 app.put('/api/checklists/:id', ({ params, body }) => cl.update(params.id, body));
 app.delete('/api/checklists/:id', ({ params }) => cl.remove(params.id));
 app.get('/api/checklists/:id/versions', ({ params }) => cl.history(params.id));
+
+// ---- Step 3: evaluation -------------------------------------------------------
+app.get('/api/model', () => ({ ...providerInfo(), pricing: pricing() }));
+
+// Preview the generated prompt (shows the jury it is built from the config).
+app.get('/api/groups/:group/conversations/:id/prompt', async ({ params, query }) => {
+  const conv = await ds.getConversation(params.group, params.id);
+  const checklist = cl.get(query.get('checklist') || 'chat-quality');
+  const facts = computeFacts(conv);
+  return { system: buildSystemPrompt(), user: buildUserPrompt(checklist, conv, facts), facts };
+});
+
+app.post('/api/groups/:group/conversations/:id/evaluate', async ({ params, body }) => {
+  const conv = await ds.getConversation(params.group, params.id);
+  const checklist = cl.get(body.checklist_id || 'chat-quality', body.checklist_version);
+  return ev.evaluate({ group: params.group, conv, checklist });
+});
+
+app.get('/api/groups/:group/conversations/:id/evaluation', ({ params, query }) => {
+  const e = ev.getEvaluation(params.group, params.id, query.get('checklist') || 'chat-quality');
+  if (!e) throw httpError(404, 'not evaluated yet');
+  return e;
+});
+
+app.get('/api/groups/:group/evaluations', ({ params, query }) =>
+  ev.listEvaluations(params.group, query.get('checklist')).map((e) => ({
+    conversation_id: e.conversation_id,
+    checklist: e.checklist,
+    created_at: e.created_at,
+    model: e.model,
+    original_total: e.original_score.total,
+    final_total: e.final_score.total,
+    gross_error: e.final_score.gross_error,
+    open_appeals: e.appeals.filter((a) => a.status === 'open').length,
+    cost_usd_estimate: e.cost_usd_estimate,
+  })),
+);
 
 // ---- static UI ----------------------------------------------------------------
 app.static('/shared/', path.join(PROJECT_ROOT, 'shared')); // pure modules shared with the browser
