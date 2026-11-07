@@ -5,6 +5,7 @@ import { loadDotEnv, PROJECT_ROOT, httpError } from './lib/store.js';
 import * as ds from './lib/datasource.js';
 import * as cl from './lib/checklists.js';
 import * as ev from './lib/evaluator.js';
+import * as ap from './lib/appeals.js';
 import { computeFacts } from './lib/facts.js';
 import { buildSystemPrompt, buildUserPrompt } from './lib/prompt.js';
 import { providerInfo, pricing } from './lib/llm.js';
@@ -89,6 +90,35 @@ app.get('/api/groups/:group/evaluations', ({ params, query }) =>
     open_appeals: e.appeals.filter((a) => a.status === 'open').length,
     cost_usd_estimate: e.cost_usd_estimate,
   })),
+);
+
+// ---- Step 6: appeals ----------------------------------------------------------
+app.get('/api/groups/:group/appeals', ({ params, query }) =>
+  ap.listAppeals(params.group, { status: query.get('status') || undefined }),
+);
+
+app.post('/api/groups/:group/conversations/:id/appeals', ({ params, body }) =>
+  ap.fileAppeal({
+    group: params.group,
+    convId: params.id,
+    checklistId: body.checklist_id || 'chat-quality',
+    criterionId: body.criterion_id,
+    comment: body.comment,
+    author: body.author,
+  }),
+);
+
+app.post('/api/groups/:group/conversations/:id/appeals/:appeal/decision', ({ params, body }) =>
+  ap.decide({
+    group: params.group,
+    convId: params.id,
+    checklistId: body.checklist_id || 'chat-quality',
+    appealId: params.appeal,
+    action: body.action,
+    answer: body.answer,
+    reason: body.reason,
+    reviewer: body.reviewer,
+  }),
 );
 
 // ---- static UI ----------------------------------------------------------------
