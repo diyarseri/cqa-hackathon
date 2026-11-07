@@ -13,12 +13,12 @@ export async function render(root, ctx) {
     return mount(root,
       h('div.page-head',
         h('div',
-          h('h1', { tabindex: -1 }, 'Аналитика'),
+          h('h1', { tabindex: -1 }, 'Результаты'),
           h('p.muted', `Набор ${ctx.group}: качество диалогов, зоны роста и результаты по каналам.`))),
       h('div.empty-state',
         h('h2', 'Пока нечего анализировать'),
         h('p', `В наборе ${ctx.group} ещё нет оценённых диалогов.`),
-        h('a.btn.primary', { href: '#/batch' }, 'Запустить пакетную оценку')),
+        h('a.btn.primary', { href: '#/batch' }, 'Проверить новые диалоги')),
     );
   }
   const weighted = d.criteria.filter((c) => c.type !== 'flag' && c.applicable);
@@ -38,13 +38,13 @@ export async function render(root, ctx) {
   mount(root,
     h('div.toolbar.page-head',
       h('div',
-        h('h1', { tabindex: -1, style: { margin: 0 } }, 'Аналитика качества'),
+        h('h1', { tabindex: -1, style: { margin: 0 } }, 'Результаты проверки'),
         h('p.muted', { style: { marginBottom: 0 } }, `Набор ${ctx.group}: итоговые оценки после решений по апелляциям.`)),
       await checklistPicker(() => render(root, ctx))),
     h('div.summary',
       h('div.kpi', h('div.v', d.evaluated), h('div.l', 'оценено диалогов')),
       h('div.kpi', h('div.v', fmtScore(d.avg_total)), h('div.l', 'средний итог')),
-      h('div.kpi', { class: d.gross.length ? 'kpi bad' : 'kpi' }, h('div.v', d.gross.length), h('div.l', 'с грубыми ошибками')),
+      h('div.kpi', { class: d.gross.length ? 'kpi bad' : 'kpi' }, h('div.v', d.gross.length), h('div.l', 'с серьёзными нарушениями')),
       h('div.kpi', h('div.v', d.needs_review), h('div.l', '⚑ требуют проверки человеком')),
       d.cost_usd_estimate ? h('div.kpi', h('div.v', `$${d.cost_usd_estimate.toFixed(2)}`), h('div.l', 'стоимость оценки набора')) : null),
     top && h('div.alert.warn', h('b', 'Главная зона роста: '), `${top.id}. ${top.title} — баллы потеряны в ${pct(top.shortfall_rate)} применимых диалогов (${top.shortfall} из ${top.applicable}). Примеры: `,
@@ -71,7 +71,7 @@ export async function render(root, ctx) {
       ? h('div.table-scroll', h('table.tbl', { 'aria-label': 'Диалоги с самыми низкими оценками' }, h('tbody', d.worst.map((w) => h('tr',
         h('td', h('a.table-link', { href: `#/c/${enc(w.conversation_id)}` }, w.conversation_id)),
         h('td.num', fmtScore(w.total)),
-        h('td', w.gross_error ? h('span.flag-gross', '⚠ грубая ошибка') : ''))))))
+        h('td', w.gross_error ? h('span.flag-gross', 'Серьёзное нарушение') : ''))))))
       : h('div.empty-state.compact', h('p', 'Диалогов с итоговой оценкой пока нет.')),
   );
 }

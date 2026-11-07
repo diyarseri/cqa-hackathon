@@ -42,7 +42,7 @@ class CardView {
     this.right = h('div');
     mount(this.root,
       h('div.toolbar',
-        h('a.btn.ghost', { href: '#/' }, '← К списку'),
+        h('a.btn.ghost', { href: '#/dialogs' }, '← Все диалоги'),
         h('h1', { style: { margin: 0 }, tabindex: -1 }, conv.conversation_id,
           h('small', ` · ${conv.channel === 'voice call' ? 'звонок' : 'чат'} · ${conv.language} · ${conv.messages.length} реплик`))),
       h('div.card-layout', left, this.right));
@@ -140,7 +140,7 @@ class CardView {
     } catch (e) {
       toast(e.message, 'err');
       btn.disabled = false;
-      btn.textContent = 'Оценить';
+      btn.textContent = 'Проверить диалог';
     } finally {
       clearInterval(this.evaluationTimer);
       this.evaluationTimer = null;
@@ -149,7 +149,7 @@ class CardView {
 
   drawResults() {
     const { evaluation: ev, checklist } = this;
-    const evalBtn = h('button.btn.primary', { onclick: (e) => this.runEvaluation(e.target) }, ev ? 'Оценить заново' : 'Оценить');
+    const evalBtn = h('button.btn.primary', { onclick: (e) => this.runEvaluation(e.target) }, ev ? 'Проверить ещё раз' : 'Проверить диалог');
     const pickSlot = h('span');
     const tools = h('div.toolbar',
       evalBtn,
@@ -158,7 +158,7 @@ class CardView {
         href: api.url(`/api/groups/${enc(this.ctx.group)}/conversations/${enc(this.conv.conversation_id)}/prompt?checklist=${enc(checklist.id)}`),
         target: '_blank',
         rel: 'noopener',
-      }, 'Промпт'));
+      }, 'Как выполняется проверка'));
     checklistPicker(() => render(this.root, this.ctx, this.conv.conversation_id)).then((el) => pickSlot.replaceWith(el));
 
     if (!ev) {
@@ -173,7 +173,7 @@ class CardView {
     const summary = h('div.summary',
       h('div.kpi', h('div.v', fs.total == null ? '—' : fmtScore(fs.total)), h('div.l', fs.total == null ? 'итог не рассчитывается: нет применимых критериев' : `итог из ${fs.max}${changed ? ' (после апелляции)' : ''}`)),
       changed && h('div.kpi', h('div.v', fmtScore(os.total)), h('div.l', 'исходная оценка')),
-      h('div.kpi', { class: fs.gross_error ? 'kpi bad' : 'kpi' }, h('div.v', fs.gross_error ? 'ДА' : 'нет'), h('div.l', 'грубая ошибка (отдельно от балла)')),
+      h('div.kpi', { class: fs.gross_error ? 'kpi bad' : 'kpi' }, h('div.v', fs.gross_error ? 'ДА' : 'нет'), h('div.l', 'серьёзное нарушение (отдельно от балла)')),
       h('div.kpi', h('div.l', `${ev.checklist.name} v${ev.checklist.version}`), h('div.l', `${ev.model} · ${fmtDate(ev.created_at)}`), h('div.l', `${ev.usage.input}+${ev.usage.output} токенов${ev.cost_usd_estimate != null ? ` · ≈$${ev.cost_usd_estimate}` : ''}`)));
 
     const sections = checklist.sections?.length ? checklist.sections : [{ id: null, title: 'Критерии' }];

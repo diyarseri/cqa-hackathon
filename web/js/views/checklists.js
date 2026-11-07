@@ -10,7 +10,7 @@ export async function render(root, ctx, id) {
   const list = await api.get('/api/checklists');
   if (!id) id = list[0]?.id;
   const side = h('aside.cl-side',
-    h('h2', 'Чек-листы'),
+    h('h2', 'Критерии оценки'),
     h('ul.cl-list', list.map((c) =>
       h('li', { class: c.id === id ? 'on' : '' },
         h('a', { href: `#/checklists/${enc(c.id)}`, 'aria-current': c.id === id ? 'page' : null }, c.name),
@@ -22,7 +22,7 @@ export async function render(root, ctx, id) {
   if (!id) return mount(main,
     h('div.page-head',
       h('div', h('h1', { tabindex: -1 }, 'Редактор чек-листов'), h('p.muted', 'Настройте критерии оценки без изменений в коде.'))),
-    h('div.empty-state', h('h2', 'Чек-листов пока нет'), h('p', 'Создайте первый чек-лист, чтобы начать оценивать диалоги.'), h('button.btn.primary', { onclick: () => newChecklist(list) }, 'Создать чек-лист')),
+    h('div.empty-state', h('h2', 'Критериев пока нет'), h('p', 'Создайте первый набор критериев, чтобы начать проверять диалоги.'), h('button.btn.primary', { onclick: () => newChecklist(list) }, 'Создать критерии')),
   );
   try {
     const doc = await api.get(`/api/checklists/${enc(id)}`);
@@ -43,7 +43,7 @@ async function newChecklist(list) {
     : { name, description: '', total_points: 100, rounding: 2, global_rules: [], sections: [], criteria: [{ ...blankCriterion([]), title: 'Новый критерий', description: 'Да — …' }] };
   try {
     const saved = await api.post('/api/checklists', body);
-    toast('Чек-лист создан');
+    toast('Критерии оценки созданы');
     location.hash = `#/checklists/${enc(saved.id)}`;
   } catch (e) {
     toast(e.message, 'err');
@@ -83,7 +83,7 @@ function editor(root, original, versions, pageRoot, ctx) {
     if (!confirm(`Удалить чек-лист «${doc.name}»? История версий сохранится для уже выполненных оценок.`)) return;
     try {
       await api.del(`/api/checklists/${enc(doc.id)}`);
-      toast('Чек-лист удалён');
+      toast('Критерии оценки удалены');
       location.hash = '#/checklists';
     } catch (e) {
       toast(e.message, 'err');

@@ -8,20 +8,20 @@ export async function render(root, ctx, appealId) {
   const all = await api.get(`/api/groups/${enc(ctx.group)}/appeals`);
   if (appealId) {
     const a = all.find((x) => x.id === appealId);
-    if (!a) return mount(root, errorBox('Апелляция не найдена'));
+    if (!a) return mount(root, errorBox('Запрос на пересмотр не найден'));
     return detail(root, ctx, a);
   }
   const open = all.filter((a) => a.status === 'open').length;
   mount(root,
     h('div.page-head',
       h('div',
-        h('h1', { tabindex: -1 }, 'Апелляции'),
+        h('h1', { tabindex: -1 }, 'Спорные оценки'),
         h('p.muted', `Набор ${ctx.group}: открыто ${open} из ${all.length}. Проверьте спорные критерии и зафиксируйте решение.`))),
     all.length === 0
       ? h('div.empty-state',
-        h('h2', 'Апелляций пока нет'),
+        h('h2', 'Спорных оценок пока нет'),
         h('p', 'Откройте карточку диалога и нажмите «Оспорить» у нужного критерия.'),
-        h('a.btn.primary', { href: '#/' }, 'Перейти к диалогам'))
+        h('a.btn.primary', { href: '#/dialogs' }, 'Перейти к диалогам'))
       : h('div.table-scroll', { tabindex: 0, role: 'region', 'aria-label': 'Список апелляций' }, h('table.tbl',
         h('thead', h('tr', h('th', 'Статус'), h('th', 'Диалог'), h('th', 'Критерий'), h('th', 'Оспорено'), h('th', 'Комментарий'), h('th.num', 'Итог'), h('th', 'Подана'))),
         h('tbody', all.map((a) => h('tr',
@@ -131,7 +131,7 @@ async function detail(root, ctx, a) {
 
   mount(root,
     h('div.toolbar.page-head', h('a.btn.ghost', { href: '#/appeals' }, '← Все апелляции'),
-      h('h1', { tabindex: -1, style: { margin: 0 } }, `Апелляция: ${a.conversation_id}, критерий ${k.id}`),
+      h('h1', { tabindex: -1, style: { margin: 0 } }, `Пересмотр оценки: ${a.conversation_id}`),
       h('a.btn.ghost', { href: `#/c/${enc(a.conversation_id)}` }, 'Открыть карточку диалога')),
     h('div.card-layout',
       h('div',
