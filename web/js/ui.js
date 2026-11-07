@@ -1,4 +1,5 @@
 // Small DOM helpers shared by the views.
+import { applyTranslations } from './i18n.js';
 
 /** h('div.card#x', {onclick}, child, 'text') */
 export function h(tag, attrs, ...children) {
@@ -23,6 +24,7 @@ export function h(tag, attrs, ...children) {
     else el.setAttribute(k, v === true ? '' : v);
   }
   append(el, children);
+  applyTranslations(el);
   return el;
 }
 
@@ -36,6 +38,7 @@ function append(el, children) {
 export function mount(el, ...children) {
   el.replaceChildren();
   append(el, children);
+  applyTranslations(el);
   return el;
 }
 

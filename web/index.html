@@ -37,18 +37,14 @@
           <a href="#/dialogs" data-tab="dialogs">Все диалоги</a>
           <a href="#/insights" data-tab="insights">Результаты</a>
           <a href="#/batch" data-tab="batch">Проверить набор</a>
-          <details class="more-menu">
-            <summary>Ещё <span aria-hidden="true">⌄</span></summary>
-            <div class="more-menu-card">
-              <a href="#/appeals" data-tab="appeals"><strong>Спорные оценки</strong><small>Решения проверяющего</small></a>
-              <a href="#/checklists" data-tab="checklists"><strong>Критерии оценки</strong><small>Правила и версии</small></a>
-              <a href="#/validation" data-tab="validation"><strong>Проверка точности</strong><small>Сравнение с человеком</small></a>
-              <div class="menu-divider"></div>
-              <button id="cqa-help-menu" type="button"><span>Как пользоваться</span><span aria-hidden="true">?</span></button>
-              <button id="cqa-command-open" type="button"><span>Быстрый переход</span><kbd>Ctrl K</kbd></button>
-              <button id="cqa-theme" type="button"><span class="theme-label">Тёмная тема</span><span class="theme-glyph" aria-hidden="true">◐</span></button>
-            </div>
-          </details>
+          <a href="#/appeals" data-tab="appeals">Спорные оценки</a>
+          <a href="#/checklists" data-tab="checklists">Критерии оценки</a>
+          <a href="#/validation" data-tab="validation">Проверка точности</a>
+          <div class="mobile-nav-tools" aria-label="Дополнительные действия">
+            <button id="cqa-command-mobile" type="button">Поиск</button>
+            <button id="cqa-help-mobile" type="button">Помощь</button>
+            <button id="cqa-theme-mobile" type="button">Тема</button>
+          </div>
         </nav>
 
         <div class="top-actions">
@@ -60,8 +56,17 @@
             <span>Набор данных</span>
             <select id="cqa-group" aria-label="Выбранный набор данных"></select>
           </label>
+          <label class="locale-pick" for="cqa-locale">
+            <span>Язык</span>
+            <select id="cqa-locale" aria-label="Язык интерфейса">
+              <option value="ru">RU</option>
+              <option value="kk">KZ</option>
+              <option value="en">EN</option>
+            </select>
+          </label>
+          <button id="cqa-command-open" class="header-tool" type="button" aria-label="Быстрый переход" title="Быстрый переход">Поиск</button>
           <button id="cqa-help-open" class="header-help" type="button">Помощь</button>
-          <a class="header-primary" href="#/batch">Проверить новые</a>
+          <button id="cqa-theme" class="header-tool theme-tool" type="button" aria-label="Включить тёмную тему" title="Тёмная тема"><span class="theme-label">Тёмная тема</span><span class="theme-glyph" aria-hidden="true">◐</span></button>
         </div>
       </div>
     </header>
