@@ -33,10 +33,10 @@ export function describeCriterion(k, sectionTitle) {
   return lines.join('\n');
 }
 
-export function formatTranscript(conv) {
+export function formatTranscript(conv, { audioTimes = false } = {}) {
   return conv.messages
     .map((m) => {
-      const t = m.offset_sec != null ? fmtClock(m.offset_sec) : m.timestamp;
+      const t = audioTimes && m.audio_sec != null ? fmtClock(m.audio_sec) : m.offset_sec != null ? fmtClock(m.offset_sec) : m.timestamp;
       const dup = m.duplicate_of != null ? ` (повтор [${m.duplicate_of}])` : '';
       return `[${m.idx}] (${t}) ${SPEAKER[m.speaker] || m.speaker.toUpperCase()}${dup}: ${oneLine(m.text)}`;
     })
@@ -45,7 +45,7 @@ export function formatTranscript(conv) {
 
 const oneLine = (s) => String(s).replace(/\s+/g, ' ').trim();
 
-export function buildUserPrompt(checklist, conv, facts) {
+export function buildUserPrompt(checklist, conv, facts, { audio = false } = {}) {
   const secTitle = Object.fromEntries((checklist.sections || []).map((s) => [s.id, s.title]));
   const parts = [];
   parts.push(`# Чек-лист: ${checklist.name} (версия ${checklist.version ?? '—'})`);
@@ -61,12 +61,14 @@ export function buildUserPrompt(checklist, conv, facts) {
     `ID: ${conv.conversation_id}; канал: ${conv.channel}; язык клиента: ${LANG[conv.language] || conv.language}; реплик: ${conv.messages.length} (номера 0–${conv.messages.length - 1}).`,
   );
   if (conv.channel === 'voice call') parts.push('Это ЗВОНОК: текст — автоматическая расшифровка речи с ошибками распознавания.');
+  if (audio)
+    parts.push('К сообщению приложена АУДИОЗАПИСЬ звонка. Критерии выше оценивай ПО ЗВУКУ голоса оператора (тон, интонация, темп, дикция, паузы), а не по тексту. Транскрипт нужен, чтобы указать номера реплик-доказательств; время в транскрипте — позиция в записи (MM:SS). Голос автоответчика и клиента не оценивай.');
   if (facts?.notes?.length) {
     parts.push('### Факты, вычисленные системой (им можно доверять)');
     parts.push(facts.notes.map((n) => `- ${n}`).join('\n'));
   }
   parts.push('### Транскрипт');
-  parts.push(formatTranscript(conv));
+  parts.push(formatTranscript(conv, { audioTimes: audio }));
 
   parts.push('## Что вернуть');
   parts.push(

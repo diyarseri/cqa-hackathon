@@ -2,6 +2,7 @@
 
 export const TYPES = ['binary', 'scale', 'flag'];
 export const TYPE_LABELS = { binary: 'Да / Нет', scale: 'Шкала', flag: 'Флаг (без баллов)' };
+export const SOURCE_LABELS = { transcript: 'Транскрипт', audio: 'Запись звонка (звук)' };
 
 /** Returns a list of human-readable problems; empty list = valid. */
 export function validateChecklist(c) {
@@ -51,6 +52,8 @@ export function validateChecklist(c) {
         if (steps.some((s) => !str(s.label))) errs.push(`${at}: every scale step needs a label`);
       }
     }
+    if (k.source != null && !['transcript', 'audio'].includes(k.source)) errs.push(`${at}: source must be transcript or audio`);
+    if (k.source === 'audio' && !k.na?.allowed) errs.push(`${at}: an audio criterion must allow N/A (chats have no recording)`);
     if (k.na?.allowed) {
       if (k.type === 'flag') errs.push(`${at}: a flag cannot be N/A`);
       if (!str(k.na.condition)) errs.push(`${at}: N/A is allowed, so the N/A condition text is required`);

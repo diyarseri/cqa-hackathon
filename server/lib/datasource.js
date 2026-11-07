@@ -88,3 +88,17 @@ export async function resolveAudio(audioUrl) {
   audioCache.set(audioUrl, { src, until: Date.now() + 45 * 60_000 });
   return src;
 }
+
+/** MP3 bytes of a call (cached in data/audio/), for audio-based criteria. */
+export async function getAudioBytes(group, conv) {
+  const fs = await import('node:fs');
+  const file = p('audio', safeId(group), `${safeId(conv.conversation_id)}.mp3`);
+  if (fs.existsSync(file)) return fs.readFileSync(file);
+  const src = await resolveAudio(conv.audio_url);
+  const res = await fetch(src, { signal: AbortSignal.timeout(120_000) });
+  if (!res.ok) throw Object.assign(new Error(`recording HTTP ${res.status}`), { status: 502, retryable: true });
+  const buf = Buffer.from(await res.arrayBuffer());
+  fs.mkdirSync(p('audio', safeId(group)), { recursive: true });
+  fs.writeFileSync(file, buf);
+  return buf;
+}

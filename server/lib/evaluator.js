@@ -8,6 +8,7 @@ import { normalizeAnswer, score, ScoringError } from '../../shared/scoring.js';
 import { scaleMax } from '../../shared/checklist.js';
 import { p, readJson, writeJson, listJson, safeId } from './store.js';
 import { computeReviewFlags } from './review.js';
+import { getAudioBytes } from './datasource.js';
 
 const MAX_REPAIRS = 2;
 
@@ -81,36 +82,74 @@ function stripFences(s) {
   return s.trim().replace(/^```(?:json)?\s*/i, '').replace(/```\s*$/, '');
 }
 
-/** Runs the LLM with up to MAX_REPAIRS correction rounds. Returns criteria + usage. */
-export async function runModel(checklist, conv, { llm = complete } = {}) {
-  const facts = computeFacts(conv);
+/** One model conversation (with repairs) for a subset of criteria. */
+async function runPart(sub, conv, facts, { llm, audio }) {
   const system = buildSystemPrompt();
-  const user = buildUserPrompt(checklist, conv, facts);
+  const user = buildUserPrompt(sub, conv, facts, { audio: !!audio });
   const schema = responseSchema();
   const usage = { input: 0, output: 0, calls: 0 };
   let prompt = user;
   let lastErrors = [];
   let model;
   for (let attempt = 0; attempt <= MAX_REPAIRS; attempt++) {
-    const r = await llm({ system, user: prompt, schema });
+    const r = await llm({ system, user: prompt, schema, audio });
     usage.input += r.usage?.input || 0;
     usage.output += r.usage?.output || 0;
     usage.calls++;
     model = r.model;
-    const v = validateModelOutput(r.text, checklist, conv);
-    if (!v.errors.length) return { criteria: v.criteria, usage, model, facts, prompt_chars: user.length, repairs: attempt };
+    const v = validateModelOutput(r.text, sub, conv);
+    if (!v.errors.length) return { criteria: v.criteria, usage, model, prompt_chars: user.length, repairs: attempt };
     lastErrors = v.errors;
     prompt = `${user}\n\n## ИСПРАВЬ ПРЕДЫДУЩИЙ ОТВЕТ\nТвой предыдущий ответ:\n${r.text.slice(0, 12000)}\n\nОшибки проверки:\n${v.errors.map((e) => `- ${e}`).join('\n')}\nВерни полный исправленный JSON.`;
   }
   throw new LlmError(`ответ модели не прошёл проверку после ${MAX_REPAIRS} исправлений: ${lastErrors.join('; ')}`, { status: 422, retryable: true });
 }
 
+/**
+ * Evaluates all criteria. Transcript criteria go in one call; criteria with
+ * source "audio" go in a second call with the recording attached, or get N/A
+ * in code when the dialogue has no recording.
+ */
+export async function runModel(checklist, conv, { llm = complete, getAudio } = {}) {
+  const facts = computeFacts(conv);
+  const textK = checklist.criteria.filter((k) => k.source !== 'audio');
+  const audioK = checklist.criteria.filter((k) => k.source === 'audio');
+  const total = { input: 0, output: 0, calls: 0 };
+  const results = new Map();
+  let model = null;
+  let repairs = 0;
+  let promptChars = 0;
+  const merge = (r) => {
+    for (const c of r.criteria) results.set(c.id, c);
+    total.input += r.usage.input; total.output += r.usage.output; total.calls += r.usage.calls;
+    model ||= r.model; repairs += r.repairs; promptChars += r.prompt_chars;
+  };
+  if (textK.length) merge(await runPart({ ...checklist, criteria: textK }, conv, facts, { llm }));
+  if (audioK.length) {
+    if (conv.audio_url && getAudio) {
+      const buf = await getAudio(conv);
+      merge(await runPart({ ...checklist, criteria: audioK }, conv, facts, { llm, audio: { data: buf.toString('base64'), format: 'mp3' } }));
+    } else {
+      for (const k of audioK)
+        results.set(k.id, {
+          id: k.id, answer: 'na', evidence: [], checked_range: null, quote: '',
+          explanation: 'Критерий оценивается по звуку, а записи у этого диалога нет.',
+          na_reason: k.na?.condition || 'Нет записи звонка.',
+        });
+    }
+  }
+  return {
+    criteria: checklist.criteria.map((k) => results.get(k.id)),
+    usage: total, model, facts, prompt_chars: promptChars, repairs,
+  };
+}
+
 const evalDir = (group) => p('evaluations', safeId(group));
 const evalFile = (group, convId, checklistId) => `${evalDir(group)}/${safeId(convId)}__${safeId(checklistId)}.json`;
 
-export async function evaluate({ group, conv, checklist, llm }) {
+export async function evaluate({ group, conv, checklist, llm, getAudio }) {
   const started = Date.now();
-  const run = await runModel(checklist, conv, { llm });
+  const run = await runModel(checklist, conv, { llm, getAudio: getAudio ?? ((c) => getAudioBytes(group, c)) });
   const answers = Object.fromEntries(run.criteria.map((c) => [c.id, c.answer]));
   const result = score(checklist, answers);
   const price = pricing();

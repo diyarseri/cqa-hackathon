@@ -16,14 +16,15 @@ export class LlmError extends Error {
   }
 }
 
-export async function complete({ system, user, schema }) {
+/** audio: optional { data: base64, format: 'mp3' } sent with the user message. */
+export async function complete({ system, user, schema, audio }) {
   const info = providerInfo();
-  return info.provider === 'openai' ? openai(info, { system, user, schema }) : gemini(info, { system, user, schema });
+  return info.provider === 'openai' ? openai(info, { system, user, schema, audio }) : gemini(info, { system, user, schema, audio });
 }
 
 // Gemini via its OpenAI-compatible endpoint: the AI Studio key goes in a plain
 // "Authorization: Bearer" header, and the JSON schema is enforced server-side.
-async function gemini({ model }, { system, user, schema }) {
+async function gemini({ model }, { system, user, schema, audio }) {
   const key = process.env.GEMINI_API_KEY;
   if (!key) throw new LlmError('GEMINI_API_KEY is not set (get a free key at aistudio.google.com)', { status: 401, retryable: false });
   // On overload (429/5xx) fall through to the next model in GEMINI_FALLBACK_MODELS.
@@ -39,6 +40,7 @@ async function gemini({ model }, { system, user, schema }) {
         system,
         user,
         schema,
+        audio,
         extra: process.env.GEMINI_REASONING ? { reasoning_effort: process.env.GEMINI_REASONING } : {},
         label: 'Gemini',
       });
@@ -53,7 +55,7 @@ async function gemini({ model }, { system, user, schema }) {
   throw lastErr;
 }
 
-async function chatCompletions({ base, key, model, system, user, schema, extra = {}, label }) {
+async function chatCompletions({ base, key, model, system, user, schema, audio, extra = {}, label }) {
   const res = await fetch(`${base.replace(/\/$/, '')}/chat/completions`, {
     method: 'POST',
     headers: { 'content-type': 'application/json', authorization: `Bearer ${key}` },
@@ -63,7 +65,10 @@ async function chatCompletions({ base, key, model, system, user, schema, extra =
       response_format: schema
         ? { type: 'json_schema', json_schema: { name: 'evaluation', schema: toJsonSchema(schema) } }
         : { type: 'json_object' },
-      messages: [{ role: 'system', content: system }, { role: 'user', content: user }],
+      messages: [
+        { role: 'system', content: system },
+        { role: 'user', content: audio ? [{ type: 'text', text: user }, { type: 'input_audio', input_audio: audio }] : user },
+      ],
       ...extra,
     }),
     signal: AbortSignal.timeout(180_000),
@@ -97,10 +102,10 @@ export function toJsonSchema(s) {
   return out;
 }
 
-async function openai({ model, base }, { system, user, schema }) {
+async function openai({ model, base }, { system, user, schema, audio }) {
   const key = process.env.OPENAI_API_KEY;
   if (!key) throw new LlmError('OPENAI_API_KEY is not set', { status: 401, retryable: false });
-  return chatCompletions({ base, key, model, system, user, schema, label: 'OpenAI' });
+  return chatCompletions({ base, key, model, system, user, schema, audio, label: 'OpenAI' });
 }
 
 /**
