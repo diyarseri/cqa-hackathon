@@ -13,7 +13,11 @@ export async function render(root, ctx, convId, focusIdx) {
   let evaluation = null;
   try {
     evaluation = await api.get(`/api/groups/${enc(ctx.group)}/conversations/${enc(convId)}/evaluation?checklist=${enc(checklistId)}`);
-  } catch {}
+  } catch (error) {
+    // A missing evaluation is the expected first-run state. Other failures
+    // should remain visible instead of being presented as "not evaluated".
+    if (error.status !== 404) throw error;
+  }
   const checklist = evaluation
     ? await api.get(`/api/checklists/${enc(evaluation.checklist.id)}?version=${evaluation.checklist.version}`)
     : await api.get(`/api/checklists/${enc(checklistId)}`);
@@ -27,7 +31,9 @@ class CardView {
   constructor(root, ctx, conv, checklist, evaluation) {
     Object.assign(this, { root, ctx, conv, checklist, evaluation });
     this.msgEls = new Map();
+    this.messagesById = new Map(conv.messages.map((message) => [String(message.idx), message]));
     this.audio = null;
+    this.evaluationTimer = null;
   }
 
   draw() {
@@ -37,7 +43,7 @@ class CardView {
     mount(this.root,
       h('div.toolbar',
         h('a.btn.ghost', { href: '#/' }, '← К списку'),
-        h('h2', { style: { margin: 0 } }, conv.conversation_id,
+        h('h1', { style: { margin: 0 }, tabindex: -1 }, conv.conversation_id,
           h('small', ` · ${conv.channel === 'voice call' ? 'звонок' : 'чат'} · ${conv.language} · ${conv.messages.length} реплик`))),
       h('div.card-layout', left, this.right));
     this.drawResults();
@@ -45,21 +51,34 @@ class CardView {
 
   player() {
     if (!this.conv.audio_url) return null;
-    this.audio = h('audio', { controls: true, preload: 'none', src: api.audioUrl(this.ctx.group, this.conv.conversation_id) });
-    return h('div.panel.player', h('span', '🎧'), this.audio);
+    this.audio = h('audio', {
+      controls: true,
+      preload: 'none',
+      src: api.audioUrl(this.ctx.group, this.conv.conversation_id),
+      'aria-label': 'Запись разговора',
+    });
+    return h('div.panel.player',
+      h('span', { 'aria-hidden': 'true' }, '🎧'),
+      h('span.player-label', 'Запись разговора'),
+      this.audio);
   }
 
   transcript() {
-    const box = h('div.transcript');
+    const box = h('div.transcript', { role: 'region', 'aria-label': 'Расшифровка диалога', tabIndex: 0 });
     for (const m of this.conv.messages) {
       const t = this.conv.audio_url && m.audio_sec != null
-        ? h('button', { title: 'Воспроизвести с этого места', onclick: () => this.seek(m) }, fmtClock(m.audio_sec))
+        ? h('button', {
+          type: 'button',
+          title: 'Воспроизвести с этого места',
+          'aria-label': `Воспроизвести с реплики ${m.idx}, ${fmtClock(m.audio_sec)}`,
+          onclick: () => this.seek(m),
+        }, fmtClock(m.audio_sec))
         : m.offset_sec != null ? fmtClock(m.offset_sec) : m.timestamp;
       const el = h(`div.msg.${m.speaker}`, { id: `m-${m.idx}`, class: `msg ${m.speaker}${m.duplicate_of != null ? ' dup' : ''}`, title: m.timestamp },
         h('div.i', m.idx),
         h('div.ts', t),
         h('div', h('div.who', SPEAKERS[m.speaker] || m.speaker, m.duplicate_of != null ? ` (повтор #${m.duplicate_of})` : ''), m.text));
-      this.msgEls.set(m.idx, el);
+      this.msgEls.set(String(m.idx), el);
       box.append(el);
     }
     this.box = box;
@@ -83,21 +102,36 @@ class CardView {
   /** Highlight messages (and optional range), scroll to the first, seek audio. */
   focus(indices, range) {
     for (const el of this.msgEls.values()) el.classList.remove('hl', 'inrange', 'flash');
-    if (range) for (let i = range.from; i <= range.to; i++) this.msgEls.get(i)?.classList.add('inrange');
-    const first = indices.length ? Math.min(...indices) : range?.from;
-    for (const i of indices) this.msgEls.get(i)?.classList.add('hl');
-    const el = this.msgEls.get(first);
+    if (range) {
+      for (const message of this.conv.messages) {
+        if (Number(message.idx) >= Number(range.from) && Number(message.idx) <= Number(range.to)) {
+          this.msgEls.get(String(message.idx))?.classList.add('inrange');
+        }
+      }
+    }
+    const numericIndices = indices.map(Number).filter(Number.isFinite);
+    const first = numericIndices.length ? Math.min(...numericIndices) : range?.from;
+    for (const i of indices) this.msgEls.get(String(i))?.classList.add('hl');
+    const el = this.msgEls.get(String(first));
     if (!el) return;
-    el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    const reducedMotion = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
+    el.scrollIntoView({ behavior: reducedMotion ? 'auto' : 'smooth', block: 'center' });
     void el.offsetWidth;
     el.classList.add('flash');
-    const m = this.conv.messages[first];
+    const m = this.messagesById.get(String(first));
     if (this.audio && m?.audio_sec != null) this.seek(m);
   }
 
   async runEvaluation(btn) {
     btn.disabled = true;
-    btn.textContent = 'Оценка… (15–40 с)';
+    const startedAt = Date.now();
+    const updateElapsed = () => {
+      const elapsed = Math.max(0, Math.floor((Date.now() - startedAt) / 1000));
+      btn.textContent = `Оценка… ${Math.floor(elapsed / 60)}:${String(elapsed % 60).padStart(2, '0')}`;
+    };
+    updateElapsed();
+    clearInterval(this.evaluationTimer);
+    this.evaluationTimer = setInterval(updateElapsed, 1000);
     try {
       this.evaluation = await api.post(`/api/groups/${enc(this.ctx.group)}/conversations/${enc(this.conv.conversation_id)}/evaluate`, { checklist_id: await currentChecklist() });
       this.checklist = await api.get(`/api/checklists/${enc(this.evaluation.checklist.id)}?version=${this.evaluation.checklist.version}`);
@@ -107,6 +141,9 @@ class CardView {
       toast(e.message, 'err');
       btn.disabled = false;
       btn.textContent = 'Оценить';
+    } finally {
+      clearInterval(this.evaluationTimer);
+      this.evaluationTimer = null;
     }
   }
 
@@ -117,7 +154,11 @@ class CardView {
     const tools = h('div.toolbar',
       evalBtn,
       pickSlot,
-      h('a.btn.ghost', { href: `/api/groups/${enc(this.ctx.group)}/conversations/${enc(this.conv.conversation_id)}/prompt?checklist=${enc(checklist.id)}`, target: '_blank' }, 'Промпт'));
+      h('a.btn.ghost', {
+        href: api.url(`/api/groups/${enc(this.ctx.group)}/conversations/${enc(this.conv.conversation_id)}/prompt?checklist=${enc(checklist.id)}`),
+        target: '_blank',
+        rel: 'noopener',
+      }, 'Промпт'));
     checklistPicker(() => render(this.root, this.ctx, this.conv.conversation_id)).then((el) => pickSlot.replaceWith(el));
 
     if (!ev) {
@@ -162,6 +203,8 @@ class CardView {
     const label = k.type === 'scale' && typeof a === 'number' ? `${a} / ${Math.max(...k.scale.steps.map((x) => x.value))}` : answerLabel(a);
     const pts = k.type === 'flag' ? 'без баллов' : s?.applicable ? `${fmtScore(s.points)} из ${fmtScore(s.effective_weight)} (вес ${k.weight})` : `N/A · вес ${k.weight} перераспределён`;
     const stepLabel = k.type === 'scale' && typeof a === 'number' ? k.scale.steps.find((x) => x.value === a)?.label : null;
+    const evidence = r.evidence || [];
+    const firstEvidence = evidence[0] ?? r.checked_range?.from;
     return h('div.res', { id: `r-${k.id}` },
       h('div.res-head', h('span.t', `${k.id}. ${k.title}`), h(`span.ans.${cls}`, label), h('span.pts', pts),
         r.votes ? h('span.muted', { title: `Ответы прогонов: ${r.votes.answers.map(answerLabel).join(', ')}` }, `голоса ${r.votes.agree}/${r.votes.total}`) : null),
@@ -171,14 +214,39 @@ class CardView {
       r.quote && h('p.muted', '«', r.quote, '»'),
       a === 'na' && r.na_reason && h('p', h('b', 'Причина N/A: '), r.na_reason),
       h('div.ev',
-        r.evidence.length ? [h('span.muted', 'Доказательства:'), r.evidence.map((i) => h('button', { onclick: () => this.focus([i], r.checked_range) }, `#${i} ${who(this.conv, i)}`))] : null,
-        r.checked_range ? h('button', { title: 'Проверенный участок разговора', onclick: () => this.focus([], r.checked_range) }, `проверено #${r.checked_range.from}–#${r.checked_range.to}`) : null),
+        evidence.length ? [h('span.muted', 'Доказательства:'), evidence.map((i) => h('button', {
+          type: 'button',
+          'aria-label': `Показать реплику ${i}, ${this.who(i)}`,
+          onclick: () => this.focus([i], r.checked_range),
+        }, `#${i} ${this.who(i)}`))] : null,
+        r.checked_range ? h('button', {
+          type: 'button',
+          title: 'Проверенный участок разговора',
+          onclick: () => this.focus([], r.checked_range),
+        }, `проверено #${r.checked_range.from}–#${r.checked_range.to}`) : null,
+        firstEvidence != null ? h('button', {
+          type: 'button',
+          title: 'Скопировать ссылку на доказательство',
+          'aria-label': `Скопировать ссылку на реплику ${firstEvidence}`,
+          onclick: () => this.copyEvidenceLink(firstEvidence),
+        }, 'Скопировать ссылку') : null),
       appealBlock(this, k, r),
     );
   }
-}
 
-function who(conv, i) {
-  const m = conv.messages[i];
-  return m ? (SPEAKERS[m.speaker] || m.speaker).toLowerCase() : '';
+  who(messageId) {
+    const message = this.messagesById.get(String(messageId));
+    return message ? (SPEAKERS[message.speaker] || message.speaker).toLowerCase() : '';
+  }
+
+  async copyEvidenceLink(messageId) {
+    const hash = `#/c/${encodeURIComponent(this.conv.conversation_id)}/${encodeURIComponent(messageId)}`;
+    const link = `${window.location.origin}${window.location.pathname}${window.location.search}${hash}`;
+    try {
+      await navigator.clipboard.writeText(link);
+      toast('Ссылка на доказательство скопирована');
+    } catch {
+      window.prompt('Скопируйте ссылку', link);
+    }
+  }
 }

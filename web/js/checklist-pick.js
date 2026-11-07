@@ -1,6 +1,6 @@
 // Which checklist the dialog views use (remembered per browser).
 import { api } from './api.js';
-import { h } from './ui.js';
+import { h, toast } from './ui.js';
 
 const KEY = 'cqa.checklist';
 const get = () => { try { return localStorage.getItem(KEY); } catch { return null; } };
@@ -8,7 +8,13 @@ const set = (v) => { try { localStorage.setItem(KEY, v); } catch {} };
 
 let cache = null;
 async function lists() {
-  cache ||= api.get('/api/checklists');
+  if (!cache) {
+    const pending = api.get('/api/checklists');
+    cache = pending;
+    pending.catch(() => {
+      if (cache === pending) cache = null;
+    });
+  }
   return cache;
 }
 export function invalidateChecklists() {
@@ -28,6 +34,10 @@ export async function checklistPicker(onChange) {
   return h('label.check', 'Чек-лист: ',
     h('select', {
       style: { width: 'auto', marginLeft: '.3rem' },
-      onchange: (e) => { set(e.target.value); onChange?.(e.target.value); },
+      onchange: async (e) => {
+        set(e.target.value);
+        try { await onChange?.(e.target.value); }
+        catch (error) { toast(error.message, 'err'); }
+      },
     }, all.map((c) => h('option', { value: c.id, selected: c.id === cur }, `${c.name} (v${c.version})`))));
 }
