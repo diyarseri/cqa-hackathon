@@ -1,4 +1,4 @@
-import { providerInfo } from '../server/lib/llm.js';
+import { modelIsInstalled, providerInfo } from '../server/lib/llm.js';
 import { loadDotEnv } from '../server/lib/store.js';
 
 loadDotEnv();
@@ -10,7 +10,7 @@ try {
   const data = await res.json();
   const names = (data.models || []).map((item) => item.name);
   const wanted = info.model;
-  const installed = names.some((name) => name === wanted || name.split(':')[0] === wanted.split(':')[0]);
+  const installed = modelIsInstalled(wanted, names);
   console.log(`Privacy: local only (${info.base})`);
   console.log(`Model: ${wanted}`);
   console.log(`Ollama: available; installed models: ${names.join(', ') || 'none'}`);

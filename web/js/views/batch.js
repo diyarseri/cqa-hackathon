@@ -30,8 +30,7 @@ export async function render(root, ctx, jobId) {
 
   const onlyMissing = h('input', { type: 'checkbox', checked: true });
   const refresh = h('input', { type: 'checkbox' });
-  const conc = h('input', { type: 'number', min: 1, max: 8, value: 4, style: { width: '4.5rem' } });
-  const runs = h('select', { style: { width: 'auto' } }, [1, 3, 5].map((n) => h('option', { value: n, selected: n === 3 }, n === 1 ? '1 (быстро)' : `${n} (голосование)`)));
+  const runs = h('select', { style: { width: 'auto' } }, [1, 3, 5].map((n) => h('option', { value: n, selected: n === 1 }, n === 1 ? '1 (рекомендуется)' : `${n} (медленнее)`)));
   const jobBox = h('div');
   const startBtn = h('button.btn.primary', { onclick: start }, 'Проверить новые диалоги');
 
@@ -40,7 +39,7 @@ export async function render(root, ctx, jobId) {
     try {
       const job = await api.post('/api/batch', {
         group_id: ctx.group, checklist_id: await currentChecklist(),
-        only_missing: onlyMissing.checked, refresh: refresh.checked, concurrency: Number(conc.value), runs: Number(runs.value),
+        only_missing: onlyMissing.checked, refresh: refresh.checked, concurrency: 1, runs: Number(runs.value),
       });
       toast(`Запущено: ${job.items.length} диалогов`);
       watch(jobBox, ctx, job.id);
@@ -69,8 +68,8 @@ export async function render(root, ctx, jobId) {
         await checklistPicker(),
         h('label.check', onlyMissing, ' Проверять только новые диалоги'),
         h('label.check', refresh, ' Обновить набор данных перед проверкой'),
-        h('label.check', 'Одновременно проверять: ', conc),
         h('label.check', 'Надёжность результата: ', runs)),
+      h('p.muted', 'Локальная модель проверяет диалоги по одному, чтобы не перегружать видеокарту.'),
       h('h3', 'Отчёт и резервная копия'),
       h('div.toolbar',
         h('a.btn', { href: api.url(`/api/groups/${enc(ctx.group)}/results.csv?checklist=${enc(await currentChecklist())}`) }, 'Скачать отчёт'),

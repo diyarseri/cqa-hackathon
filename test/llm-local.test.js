@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { assertLocalEndpoint, complete, providerInfo } from '../server/lib/llm.js';
+import { assertLocalEndpoint, complete, modelIsInstalled, providerInfo } from '../server/lib/llm.js';
 
 test('local edition accepts loopback Ollama endpoints', () => {
   assert.equal(assertLocalEndpoint('http://127.0.0.1:11434'), 'http://127.0.0.1:11434');
@@ -20,6 +20,12 @@ test('provider cannot be switched to a cloud provider', () => {
   process.env.LLM_PROVIDER = 'gemini';
   try { assert.throws(() => providerInfo(), /работает только локально/); }
   finally { old === undefined ? delete process.env.LLM_PROVIDER : process.env.LLM_PROVIDER = old; }
+});
+
+test('model readiness requires the requested Ollama tag', () => {
+  assert.equal(modelIsInstalled('qwen2.5:7b', ['qwen2.5:7b']), true);
+  assert.equal(modelIsInstalled('qwen2.5:7b', ['qwen2.5:3b']), false);
+  assert.equal(modelIsInstalled('qwen2.5', ['qwen2.5:latest']), true);
 });
 
 test('Ollama adapter uses native local chat with JSON schema', async () => {
@@ -47,6 +53,7 @@ test('Ollama adapter uses native local chat with JSON schema', async () => {
     assert.equal(request.headers.authorization, undefined);
     assert.equal(request.body.stream, false);
     assert.equal(request.body.format.type, 'object');
+    assert.equal(request.body.options.num_ctx, 8192);
     assert.equal(request.body.messages[1].content, 'untrusted transcript');
     assert.deepEqual(result.usage, { input: 10, output: 4 });
   } finally {

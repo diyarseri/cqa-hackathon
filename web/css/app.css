@@ -873,7 +873,7 @@ html[data-theme="dark"] .cqa .tabs > a[aria-current="page"] { color: #8eec8c; }
 .cqa .menu-toggle { display: none; }
 
 .cqa .top-actions { gap: .55rem; }
-.cqa .connection { min-height: auto; padding: .35rem; border: 0; background: transparent; }
+.cqa .connection { min-height: 36px; padding: .35rem .55rem; border: 1px solid var(--line); background: var(--surface-soft); color: var(--muted-strong); }
 .cqa .connection-dot { width: 9px; height: 9px; }
 .cqa .header-picker {
   position: relative;

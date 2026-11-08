@@ -23,7 +23,7 @@ function summarize(job) {
   return job;
 }
 
-export async function startBatch({ group, checklistId = 'chat-quality', onlyMissing = true, refresh = false, concurrency = 2, ids, llm, runs } = {}) {
+export async function startBatch({ group, checklistId = 'chat-quality', onlyMissing = true, refresh = false, concurrency = 1, ids, llm, runs } = {}) {
   if (!group) throw httpError(400, 'group is required');
   const checklist = cl.get(checklistId); // current version at start; pinned for the whole job
   const convs = await ds.getConversations(group, { refresh });
@@ -33,7 +33,9 @@ export async function startBatch({ group, checklistId = 'chat-quality', onlyMiss
     group_id: group,
     checklist: { id: checklist.id, version: checklist.version, name: checklist.name },
     only_missing: onlyMissing,
-    concurrency: Math.max(1, Math.min(8, Number(concurrency) || 2)),
+    // One local GPU should process one dialogue at a time. Parallel Ollama
+    // requests increase memory pressure and were the main source of timeouts.
+    concurrency: 1,
     runs: Math.max(1, Math.min(7, Number(runs ?? process.env.EVAL_RUNS ?? 1) || 1)),
     status: 'running',
     started_at: new Date().toISOString(),

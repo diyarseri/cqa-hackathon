@@ -126,8 +126,11 @@ async function loadGroups() {
   let groups = [];
   setConnection('pending', 'Подключение');
   try {
-    groups = (await api.get('/api/groups')).groups;
-    setConnection('online', 'Сервер доступен');
+    const [groupResult, model] = await Promise.all([api.get('/api/groups'), api.get('/api/model')]);
+    groups = groupResult.groups;
+    if (!model.status?.available) setConnection('offline', 'Ollama не запущена', model.status?.detail);
+    else if (!model.status?.model_installed) setConnection('offline', 'Модель не установлена', model.status?.detail);
+    else setConnection('online', 'Локальная модель готова');
   } catch (error) {
     setConnection('offline', 'Нет связи', error.message);
   }

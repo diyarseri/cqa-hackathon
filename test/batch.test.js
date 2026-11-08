@@ -44,6 +44,7 @@ test('batch: transient failures are retried, permanent ones reported, then retry
   };
   const job = await batch.startBatch({ group: 'G', concurrency: 2, llm });
   assert.equal(job.items.length, 3);
+  assert.equal(job.concurrency, 1);
   const done = await waitDone(job.id);
   const st = Object.fromEntries(done.items.map((i) => [i.conversation_id, i]));
   assert.equal(st.a.status, 'done');

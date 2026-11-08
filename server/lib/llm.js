@@ -21,6 +21,29 @@ export function providerInfo() {
   };
 }
 
+export async function providerStatus() {
+  const info = providerInfo();
+  try {
+    const res = await fetch(`${info.base}/api/tags`, { signal: AbortSignal.timeout(2_500) });
+    if (!res.ok) return { available: false, model_installed: false, detail: `Ollama HTTP ${res.status}` };
+    const data = await res.json();
+    const installed_models = (data.models || []).map((item) => item.name).filter(Boolean);
+    return {
+      available: true,
+      model_installed: modelIsInstalled(info.model, installed_models),
+      installed_models,
+      detail: modelIsInstalled(info.model, installed_models) ? 'Локальная модель готова.' : `Выполните: ollama pull ${info.model}`,
+    };
+  } catch {
+    return { available: false, model_installed: false, installed_models: [], detail: 'Запустите приложение Ollama.' };
+  }
+}
+
+export function modelIsInstalled(wanted, installed) {
+  const exact = String(wanted).includes(':') ? String(wanted) : `${wanted}:latest`;
+  return installed.some((name) => name === wanted || name === exact);
+}
+
 export class LlmError extends Error {
   constructor(msg, { status, retryable } = {}) {
     super(msg);
@@ -78,6 +101,7 @@ export async function complete({ system, user, schema, audio }) {
         ],
         options: {
           temperature: 0,
+          num_ctx: boundedNumber(process.env.OLLAMA_CONTEXT_TOKENS, 8_192, 2_048, 32_768),
           num_predict: boundedNumber(process.env.OLLAMA_MAX_TOKENS, 8_000, 512, 16_000),
         },
       }),

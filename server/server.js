@@ -12,7 +12,7 @@ import * as ins from './lib/insights.js';
 import * as bundle from './lib/bundle.js';
 import { computeFacts } from './lib/facts.js';
 import { buildSystemPrompt, buildUserPrompt } from './lib/prompt.js';
-import { providerInfo, pricing } from './lib/llm.js';
+import { providerInfo, providerStatus, pricing } from './lib/llm.js';
 import { computeReviewFlags } from './lib/review.js';
 
 loadDotEnv();
@@ -66,7 +66,7 @@ app.delete('/api/checklists/:id', ({ params }) => cl.remove(params.id));
 app.get('/api/checklists/:id/versions', ({ params }) => cl.history(params.id));
 
 // ---- Step 3: evaluation -------------------------------------------------------
-app.get('/api/model', () => ({ ...providerInfo(), pricing: pricing() }));
+app.get('/api/model', async () => ({ ...providerInfo(), status: await providerStatus(), pricing: pricing() }));
 
 // Preview the generated prompt (shows the jury it is built from the config).
 app.get('/api/groups/:group/conversations/:id/prompt', async ({ params, query }) => {
