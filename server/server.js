@@ -199,5 +199,6 @@ app.static('/shared/', path.join(PROJECT_ROOT, 'shared')); // pure modules share
 app.static('/', path.join(PROJECT_ROOT, 'web'));
 
 const port = Number(process.env.PORT || 8080);
-const host = process.env.HOST || '127.0.0.1';
+// This edition is intentionally available only on the current computer.
+const host = '127.0.0.1';
 app.listen(port, host).then(() => console.log(`CQA running on http://${host}:${port}`));

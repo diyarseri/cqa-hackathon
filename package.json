@@ -7,6 +7,7 @@
   "engines": { "node": ">=20" },
   "scripts": {
     "start": "node server/server.js",
+    "local:check": "node scripts/check-local.js",
     "test": "node --test test/*.test.js"
   }
 }

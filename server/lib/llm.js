@@ -1,11 +1,24 @@
-// LLM providers. Gemini (Google AI Studio key) by default; any OpenAI-compatible
-// endpoint as an alternative. Both return { text, usage:{input,output}, model }.
+// Local-only LLM adapter. Evaluation requests may only go to an Ollama server
+// bound to this computer; external model endpoints are rejected in code.
+
+const DEFAULT_BASE = 'http://127.0.0.1:11434';
+const DEFAULT_MODEL = 'qwen2.5:7b';
 
 export function providerInfo() {
-  const provider = (process.env.LLM_PROVIDER || 'gemini').toLowerCase();
-  if (provider === 'openai')
-    return { provider, model: process.env.OPENAI_MODEL || 'gpt-4.1-mini', base: process.env.OPENAI_BASE_URL || 'https://api.openai.com/v1' };
-  return { provider: 'gemini', model: process.env.GEMINI_MODEL || 'gemini-3.5-flash' };
+  const requested = (process.env.LLM_PROVIDER || 'ollama').toLowerCase();
+  if (requested !== 'ollama' && requested !== 'local') {
+    throw new LlmError(
+      `Эта копия работает только локально. LLM_PROVIDER=${requested} запрещён; укажите ollama.`,
+      { status: 500, retryable: false },
+    );
+  }
+  return {
+    provider: 'ollama-local',
+    model: process.env.OLLAMA_MODEL || DEFAULT_MODEL,
+    base: assertLocalEndpoint(process.env.OLLAMA_BASE_URL || DEFAULT_BASE),
+    local_only: true,
+    transcript_leaves_device: false,
+  };
 }
 
 export class LlmError extends Error {
@@ -16,75 +29,88 @@ export class LlmError extends Error {
   }
 }
 
-/** audio: optional { data: base64, format: 'mp3' } sent with the user message. */
+export function assertLocalEndpoint(value) {
+  let url;
+  try {
+    url = new URL(value || DEFAULT_BASE);
+  } catch {
+    throw new LlmError(`Некорректный OLLAMA_BASE_URL: ${value}`, { status: 500, retryable: false });
+  }
+  const host = url.hostname.toLowerCase();
+  const ipv4 = host.split('.').map(Number);
+  const loopbackV4 = ipv4.length === 4 && ipv4[0] === 127 && ipv4.every((part) => Number.isInteger(part) && part >= 0 && part <= 255);
+  const local = host === 'localhost' || host === '::1' || host === '[::1]' || loopbackV4;
+  if (!local || !['http:', 'https:'].includes(url.protocol)) {
+    throw new LlmError(
+      `Локальный режим заблокировал внешний адрес модели: ${url.origin}. Используйте Ollama на 127.0.0.1.`,
+      { status: 500, retryable: false },
+    );
+  }
+  if (url.username || url.password || (url.pathname !== '/' && url.pathname !== '')) {
+    throw new LlmError('OLLAMA_BASE_URL должен содержать только локальный адрес и порт.', { status: 500, retryable: false });
+  }
+  return url.origin;
+}
+
+/** Complete one structured evaluation using Ollama's native local API. */
 export async function complete({ system, user, schema, audio }) {
   const info = providerInfo();
-  return info.provider === 'openai' ? openai(info, { system, user, schema, audio }) : gemini(info, { system, user, schema, audio });
-}
-
-// Gemini via its OpenAI-compatible endpoint: the AI Studio key goes in a plain
-// "Authorization: Bearer" header, and the JSON schema is enforced server-side.
-async function gemini({ model }, { system, user, schema, audio }) {
-  const key = process.env.GEMINI_API_KEY;
-  if (!key) throw new LlmError('GEMINI_API_KEY is not set (get a free key at aistudio.google.com)', { status: 401, retryable: false });
-  // On overload (429/5xx) fall through to the next model in GEMINI_FALLBACK_MODELS.
-  const fallbacks = (process.env.GEMINI_FALLBACK_MODELS ?? 'gemini-3.8-flash,gemini-3.5-flash-lite')
-    .split(',').map((m) => m.trim()).filter((m) => m && m !== model);
-  let lastErr;
-  for (const m of [model, ...fallbacks]) {
-    try {
-      return await chatCompletions({
-        base: 'https://generativelanguage.googleapis.com/v1beta/openai',
-        key,
-        model: m,
-        system,
-        user,
-        schema,
-        audio,
-        extra: process.env.GEMINI_REASONING ? { reasoning_effort: process.env.GEMINI_REASONING } : {},
-        label: 'Gemini',
-      });
-    } catch (e) {
-      // Keep the first overload error: a later 404 (retired fallback model)
-      // must not hide it, or the batch would stop retrying.
-      if (!lastErr || (e.retryable && !lastErr.retryable)) lastErr = e;
-      if (!(e.retryable || e.status === 404)) throw e;
-    }
+  if (audio) {
+    throw new LlmError(
+      'Выбранная локальная текстовая модель не анализирует аудиофайл. Используйте критерии по транскрипту или локальную мультимодальную модель.',
+      { status: 422, retryable: false },
+    );
   }
-  if (lastErr && !lastErr.retryable && lastErr.status === 404) lastErr.retryable = true;
-  throw lastErr;
-}
-
-async function chatCompletions({ base, key, model, system, user, schema, audio, extra = {}, label }) {
-  const res = await fetch(`${base.replace(/\/$/, '')}/chat/completions`, {
-    method: 'POST',
-    headers: { 'content-type': 'application/json', authorization: `Bearer ${key}` },
-    body: JSON.stringify({
-      model,
-      temperature: 0,
-      response_format: schema
-        ? { type: 'json_schema', json_schema: { name: 'evaluation', schema: toJsonSchema(schema) } }
-        : { type: 'json_object' },
-      messages: [
-        { role: 'system', content: system },
-        { role: 'user', content: audio ? [{ type: 'text', text: user }, { type: 'input_audio', input_audio: audio }] : user },
-      ],
-      ...extra,
-    }),
-    signal: AbortSignal.timeout(180_000),
-  });
+  const timeout = boundedNumber(process.env.OLLAMA_TIMEOUT_MS, 300_000, 10_000, 900_000);
+  let res;
+  try {
+    res = await fetch(`${info.base}/api/chat`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({
+        model: info.model,
+        stream: false,
+        think: false,
+        format: schema ? toJsonSchema(schema) : 'json',
+        messages: [
+          { role: 'system', content: system },
+          { role: 'user', content: user },
+        ],
+        options: {
+          temperature: 0,
+          num_predict: boundedNumber(process.env.OLLAMA_MAX_TOKENS, 8_000, 512, 16_000),
+        },
+      }),
+      signal: AbortSignal.timeout(timeout),
+    });
+  } catch (error) {
+    if (error?.name === 'TimeoutError') {
+      throw new LlmError(`Локальная модель не ответила за ${Math.round(timeout / 1000)} с.`, { status: 504, retryable: true });
+    }
+    throw new LlmError(
+      `Не удалось подключиться к локальной Ollama (${info.base}). Запустите Ollama и загрузите модель ${info.model}.`,
+      { status: 503, retryable: true },
+    );
+  }
   const raw = await res.text();
   let data = {};
   try { data = JSON.parse(raw); } catch {}
-  if (Array.isArray(data)) data = data[0] || {};
-  if (!res.ok) throw new LlmError(`${label} HTTP ${res.status}: ${data?.error?.message || raw.slice(0, 300)}`.trim(), { status: res.status });
-  const text = data.choices?.[0]?.message?.content || '';
-  if (!text) throw new LlmError(`${label} returned no text (finish_reason ${data.choices?.[0]?.finish_reason || '?'})`, { status: 502 });
+  if (!res.ok) {
+    const detail = String(data?.error || raw).slice(0, 300);
+    throw new LlmError(`Ollama HTTP ${res.status}: ${detail}`.trim(), { status: res.status });
+  }
+  const text = data?.message?.content || '';
+  if (!text) throw new LlmError('Ollama вернула пустой ответ.', { status: 502, retryable: true });
   return {
     text,
-    model: data.model || model,
-    usage: { input: data.usage?.prompt_tokens || 0, output: data.usage?.completion_tokens || 0 },
+    model: data.model || info.model,
+    usage: { input: data.prompt_eval_count || 0, output: data.eval_count || 0 },
   };
+}
+
+function boundedNumber(value, fallback, min, max) {
+  const n = Number(value);
+  return Number.isFinite(n) ? Math.max(min, Math.min(max, Math.round(n))) : fallback;
 }
 
 /** Gemini-style schema (type: 'OBJECT', nullable) → standard JSON Schema. */
@@ -102,25 +128,13 @@ export function toJsonSchema(s) {
   return out;
 }
 
-async function openai({ model, base }, { system, user, schema, audio }) {
-  const key = process.env.OPENAI_API_KEY;
-  if (!key) throw new LlmError('OPENAI_API_KEY is not set', { status: 401, retryable: false });
-  return chatCompletions({ base, key, model, system, user, schema, audio, label: 'OpenAI' });
-}
-
-/**
- * USD per 1M tokens for the cost estimate. Prices change often, so they are
- * NOT hardcoded: set LLM_PRICE_IN / LLM_PRICE_OUT from the provider's pricing
- * page. Unset → the cost estimate is null and only token counts are reported.
- */
 export function pricing() {
   const { provider, model } = providerInfo();
-  const num = (v) => (v == null || v === '' ? null : Number(v));
   return {
     provider,
     model,
-    in: num(process.env.LLM_PRICE_IN),
-    out: num(process.env.LLM_PRICE_OUT),
-    note: 'Paid-tier price per 1M tokens from env. The Gemini API free tier costs $0 within its rate limits.',
+    in: 0,
+    out: 0,
+    note: 'Локальная Ollama не тарифицирует токены. Модель работает на этом компьютере.',
   };
 }
